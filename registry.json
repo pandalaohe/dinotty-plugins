@@ -1,0 +1,88 @@
+{
+  "plugins": [
+    {
+      "id": "cc-switch",
+      "name": "CC Switch",
+      "description": "Quick switch Claude Code API Provider (based on cc-switch CLI)",
+      "description_zh": "快速切换 Claude Code API Provider (基于 cc-switch CLI)",
+      "version": "2.0.0",
+      "icon": "repeat",
+      "repo": "OWNER/dinotty-plugins",
+      "branch": "main",
+      "subdir": "cc-switch",
+      "author": "dinotty"
+    },
+    {
+      "id": "command-bookmarks",
+      "name": "Command Bookmarks",
+      "description": "Bookmark and batch-send commands to multiple terminals",
+      "description_zh": "命令收藏夹，支持批量发送到多个终端",
+      "version": "1.0.0",
+      "icon": "bookmark",
+      "repo": "OWNER/dinotty-plugins",
+      "branch": "main",
+      "subdir": "command-bookmarks",
+      "author": "dinotty"
+    },
+    {
+      "id": "dinotty-relay",
+      "name": "Dinotty Relay",
+      "description": "Terminal sharing client — connect to Relay server, share your terminal via QR code",
+      "description_zh": "终端分享客户端，连接 Relay 服务器，通过二维码分享终端",
+      "version": "0.2.0",
+      "icon": "radio",
+      "repo": "OWNER/dinotty-plugins",
+      "branch": "main",
+      "subdir": "dinotty-relay",
+      "author": "dinotty"
+    },
+    {
+      "id": "dinotty-whiteboard",
+      "name": "Whiteboard",
+      "description": "Infinite canvas whiteboard with freehand drawing, shapes, text and images",
+      "description_zh": "无限画布白板工具，支持自由绘图、图形、文本和图片",
+      "version": "1.0.0",
+      "icon": "pen-tool",
+      "repo": "OWNER/dinotty-plugins",
+      "branch": "main",
+      "subdir": "dinotty-whiteboard",
+      "author": "dinotty"
+    },
+    {
+      "id": "json-formatter",
+      "name": "JSON Formatter",
+      "description": "JSON formatting, minifying and validation tool",
+      "description_zh": "JSON 格式化、压缩与验证工具",
+      "version": "1.0.0",
+      "icon": "braces",
+      "repo": "OWNER/dinotty-plugins",
+      "branch": "main",
+      "subdir": "json-formatter",
+      "author": "dinotty"
+    },
+    {
+      "id": "skill-manager",
+      "name": "Skill Manager",
+      "description": "Manage Claude Code Agent Skills (~/.claude/skills/)",
+      "description_zh": "管理 Claude Code Agent Skills (~/.claude/skills/)",
+      "version": "1.0.0",
+      "icon": "zap",
+      "repo": "OWNER/dinotty-plugins",
+      "branch": "main",
+      "subdir": "skill-manager",
+      "author": "dinotty"
+    },
+    {
+      "id": "text-diff",
+      "name": "Text Diff",
+      "description": "Text diff comparison tool with line-by-line highlighting",
+      "description_zh": "文本差异对比工具，支持逐行对比与高亮显示",
+      "version": "1.0.0",
+      "icon": "diff",
+      "repo": "OWNER/dinotty-plugins",
+      "branch": "main",
+      "subdir": "text-diff",
+      "author": "dinotty"
+    }
+  ]
+}
