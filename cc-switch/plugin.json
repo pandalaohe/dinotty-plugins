@@ -4,7 +4,7 @@
   "version": "2.0.0",
   "description": "快速切换 Claude Code API Provider (基于 cc-switch CLI)",
   "icon": "repeat",
-  "entry": "./main.js",
+  "entry": "./dist/main.js",
   "styles": "./styles.css",
   "bin": {
     "mode": "cli",
