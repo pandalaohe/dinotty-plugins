@@ -6,7 +6,25 @@
       "Bash(git commit *)",
       "Bash(git branch *)",
       "Bash(git remote *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(npm run *)",
+      "Bash(python3 -m json.tool --no-ensure-ascii)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('cwd',''\\)\\)\")",
+      "Bash(python3 *)",
+      "Bash(node dist/cli list-projects)",
+      "Bash(node dist/cli list-recent 5)",
+      "Bash(node dist/cli read-session \"-Users-talentc-rust-dinotty-plugins\" \"8e6f1a13-6764-4939-a33d-3d141ca45f10\")",
+      "Bash(node *)",
+      "Bash(~/.dinotty/plugins/cc-chat-manager/dist/cli list-recent *)",
+      "Bash(npm list *)",
+      "WebFetch(domain:unpkg.com)",
+      "Bash(npm install *)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(git pull *)",
+      "Bash(git stash *)",
+      "WebSearch",
+      "Bash(/Users/talentc/rust/dinotty-plugins/claude-code/dist/cli-wrapper list-recent *)",
+      "Bash(/Users/talentc/.dinotty/plugins/claude-code/dist/cli-wrapper list-recent *)"
     ]
   }
 }
