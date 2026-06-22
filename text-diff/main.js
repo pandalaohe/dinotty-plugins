@@ -1,7 +1,7 @@
 function activate(context) {
   const { h, ref, computed } = context;
 
-  context.commands.register('text-diff.open', () => {});
+  context.commands.register('text-diff.open', () => { context.open() });
 
   const component = {
     setup() {

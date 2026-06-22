@@ -2141,15 +2141,21 @@ function drawMinimap(minimapCanvas, board, mainCanvasWidth, mainCanvasHeight) {
 // src/main.js
 function activate(ctx) {
   const { h, ref, reactive, onMounted, onUnmounted } = ctx;
+  const _actions = {};
   ctx.commands.register("whiteboard.open", () => {
+    ctx.open();
   });
   ctx.commands.register("whiteboard.new", () => {
+    _actions.new?.();
   });
   ctx.commands.register("whiteboard.clear", () => {
+    _actions.clear?.();
   });
   ctx.commands.register("whiteboard.export-png", () => {
+    _actions.exportPng?.();
   });
   ctx.commands.register("whiteboard.export-json", () => {
+    _actions.exportJson?.();
   });
   const component = {
     setup() {
@@ -2223,6 +2229,10 @@ function activate(ctx) {
         board.currentStrokeColor = state.strokeColor;
         board.currentFillColor = state.fillColor;
         board.setTool("pen");
+        _actions.clear = () => board.clearAll();
+        _actions.new = () => { board.clearAll(); };
+        _actions.exportPng = () => exportPng();
+        _actions.exportJson = () => exportJson();
         board.tools.text.setOnTextEdit((el) => {
           cleanupTextEdit();
           state.editingText = el;

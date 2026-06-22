@@ -212,7 +212,7 @@ export function activate(ctx) {
 
   // ── Commands ──────────────────────────────────────────────────────────────────
 
-  ctx.commands.register('json-formatter.open', () => {})
+  ctx.commands.register('json-formatter.open', () => { ctx.open() })
 
   // ── Render ────────────────────────────────────────────────────────────────────
 

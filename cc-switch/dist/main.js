@@ -242,6 +242,7 @@ function activate(ctx) {
     return d.toLocaleDateString("zh-CN");
   }
   ctx.commands.register("cc-switch.open", () => {
+    ctx.open();
   });
   ctx.commands.register("cc-switch.next", switchNext);
   ctx.onMounted(() => refresh());

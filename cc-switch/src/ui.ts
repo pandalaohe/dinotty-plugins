@@ -338,7 +338,7 @@ export function activate(ctx: PluginContext): PluginExports {
   }
 
   // Register command palette commands
-  ctx.commands.register('cc-switch.open', () => {})
+  ctx.commands.register('cc-switch.open', () => { ctx.open() })
   ctx.commands.register('cc-switch.next', switchNext)
 
   ctx.onMounted(() => refresh())
