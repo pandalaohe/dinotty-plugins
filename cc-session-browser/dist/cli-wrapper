@@ -27,7 +27,6 @@ find_node() {
   local candidates=(
     "/usr/local/bin/node"
     "/opt/homebrew/bin/node"
-    "$home/.nvm/versions/node/v23.7.0/bin/node"
   )
   for c in "${candidates[@]}"; do
     if [[ -x "$c" ]]; then

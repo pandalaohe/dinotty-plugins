@@ -81,8 +81,8 @@
     {
       "id": "cc-session-browser",
       "name": "CC Session Browser",
-      "description": "Read-only Claude Code session browser — browse, resume, archive history sessions",
-      "description_zh": "Claude Code 历史会话浏览器 — 只读浏览、恢复、归档管理",
+      "description": "Read-only Claude Code session browser — browse, search, archive/restore history sessions (no composer)",
+      "description_zh": "Claude Code 历史会话只读浏览器 — 浏览、搜索、归档/恢复会话（无输入框）",
       "version": "0.1.0",
       "icon": "history",
       "repo": "xichan96/dinotty-plugins",
