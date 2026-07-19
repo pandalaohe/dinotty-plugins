@@ -54,6 +54,20 @@ function hasClass(node, className) {
   return Array.isArray(value) ? value.includes(className) : String(value || '').split(/\s+/).includes(className)
 }
 
+function findPinRow(rendered, pinPath) {
+  return flatten(rendered).find(node => hasClass(node, 'ccm-browser-pin-row') && node.props.title === pinPath)
+}
+
+function findPinReveal(rendered) {
+  const revealTitle = dictionaries.en['pin-reveal-in-tree']
+  const reveals = flatten(rendered).filter(node => node?.tag === 'button' && node.props?.title === revealTitle)
+  assert.equal(reveals.length, 1, 'pin reveal action is not a single header control')
+  const header = flatten(rendered).find(node => hasClass(node, 'ccm-browser-pins-header'))
+  const controls = flatten(header).find(node => hasClass(node, 'ccm-browser-pins-controls'))
+  assert.equal(flatten(controls).includes(reveals[0]), true, 'pin reveal action is not in the pins header control group')
+  return reveals[0]
+}
+
 function deferred() {
   let resolve
   const promise = new Promise(done => { resolve = done })
@@ -257,6 +271,180 @@ function switchAgent(harness, agent) {
   select.props.onChange({ target: { value: agent } })
 }
 
+test('pins are rendered as a sibling above the independently flexing tree pane main', async () => {
+  const harness = await mountPins()
+  try {
+    const treePane = flatten(harness.render()).find(node => node?.tag === 'aside' && hasClass(node, 'ccm-browser-tree-pane'))
+    const children = treePane.children.flat()
+    assert.equal(hasClass(children[0], 'ccm-browser-pins-section'), true, 'pins section is not the first tree-pane child')
+    assert.equal(hasClass(children[1], 'ccm-browser-tree-pane-main'), true, 'tree pane content is not wrapped after pins')
+    assert.equal(flatten(children[1]).some(node => hasClass(node, 'ccm-browser-pins-section')), false,
+      'pins section is still nested in the tree pane main')
+  } finally {
+    harness.cleanup()
+  }
+})
+
+test('activatePin preserves the visible tree root while selecting the exact pin and marking it active', async () => {
+  const harness = await mountPins({
+    storageEntries: [['treeRoot:claude-code', '/work']],
+    pinsByAgent: { 'claude-code': [{ path: '/outside-pin', addedAt: 1, exists: true }], codex: [] },
+  })
+  try {
+    const rootBefore = harness.storage.get('treeRoot:claude-code')
+    findPinRow(harness.render(), '/outside-pin').props.onClick()
+
+    const rendered = harness.render()
+    const rootPath = flatten(rendered).find(node => hasClass(node, 'ccm-browser-root-path'))
+    const activeRow = findPinRow(rendered, '/outside-pin')
+    assert.equal(rootPath.props.title, '/work', 'activatePin changed visibleRoot')
+    assert.equal(harness.storage.get('treeRoot:claude-code'), rootBefore, 'activatePin persisted a new tree root')
+    assert.match(textOf(flatten(rendered).find(node => hasClass(node, 'ccm-browser-scope-summary'))),
+      /Exact directory.*\/outside-pin/, 'activatePin did not commit exact pin scope')
+    assert.equal(hasClass(activeRow, 'ccm-browser-pin-row-active'), true, 'activated pin row is missing its active modifier')
+    assert.equal(activeRow.props['aria-current'], 'true', 'activated pin row is missing aria-current')
+  } finally {
+    harness.cleanup()
+  }
+})
+
+test('pin header reveal is disabled and does nothing when no pin is active', async () => {
+  const harness = await mountPins({
+    storageEntries: [
+      ['treeRoot:claude-code', '/work'],
+      ['treeExpandedPaths:claude-code', []],
+    ],
+    pinsByAgent: {
+      'claude-code': [{ path: '/work/inside/leaf', addedAt: 1, exists: true }],
+      codex: [],
+    },
+  })
+  try {
+    let rendered = harness.render()
+    const reveal = findPinReveal(rendered)
+    const rootBefore = flatten(rendered).find(node => hasClass(node, 'ccm-browser-root-path')).props.title
+    const scopeBefore = textOf(flatten(rendered).find(node => hasClass(node, 'ccm-browser-scope-summary')))
+    const expandedBefore = harness.storage.get('treeExpandedPaths:claude-code')
+    assert.equal(reveal.props.disabled, true, 'pin header reveal is enabled without an active pin')
+    reveal.props.onClick()
+
+    rendered = harness.render()
+    assert.equal(flatten(rendered).find(node => hasClass(node, 'ccm-browser-root-path')).props.title, rootBefore,
+      'disabled pin header reveal changed visibleRoot')
+    assert.equal(textOf(flatten(rendered).find(node => hasClass(node, 'ccm-browser-scope-summary'))), scopeBefore,
+      'disabled pin header reveal changed the committed scope')
+    assert.deepEqual(harness.storage.get('treeExpandedPaths:claude-code'), expandedBefore,
+      'disabled pin header reveal expanded tree paths')
+  } finally {
+    harness.cleanup()
+  }
+})
+
+test('pin header reveal uses the active inside pin without changing visibleRoot', async () => {
+  const harness = await mountPins({
+    storageEntries: [
+      ['treeRoot:claude-code', '/work'],
+      ['treeExpandedPaths:claude-code', []],
+    ],
+    pinsByAgent: {
+      'claude-code': [{ path: '/work/inside/leaf', addedAt: 1, exists: true }],
+      codex: [],
+    },
+  })
+  try {
+    findPinRow(harness.render(), '/work/inside/leaf').props.onClick()
+    const reveal = findPinReveal(harness.render())
+    assert.equal(reveal.props.disabled, false, 'pin header reveal is disabled for an active pin')
+    reveal.props.onClick()
+
+    const rendered = harness.render()
+    assert.equal(flatten(rendered).find(node => hasClass(node, 'ccm-browser-root-path')).props.title, '/work',
+      'revealing an inside pin changed visibleRoot')
+    assert.match(textOf(flatten(rendered).find(node => hasClass(node, 'ccm-browser-scope-summary'))),
+      /Subtree.*\/work\/inside\/leaf/, 'inside reveal did not commit subtree scope')
+    assert.equal(harness.storage.get('treeExpandedPaths:claude-code').includes('/work/inside'), true,
+      'inside reveal did not expand the pin ancestors')
+    assert.equal(hasClass(findPinRow(rendered, '/work/inside/leaf'), 'ccm-browser-pin-row-active'), true,
+      'inside reveal cleared the active pin')
+  } finally {
+    harness.cleanup()
+  }
+})
+
+test('pin header reveal moves visibleRoot to the active outside pin', async () => {
+  const harness = await mountPins({
+    storageEntries: [['treeRoot:claude-code', '/work']],
+    pinsByAgent: {
+      'claude-code': [
+        { path: '/work/inside', addedAt: 1, exists: true },
+        { path: '/elsewhere/deep', addedAt: 2, exists: true },
+      ],
+      codex: [],
+    },
+  })
+  try {
+    findPinRow(harness.render(), '/elsewhere/deep').props.onClick()
+    const reveal = findPinReveal(harness.render())
+    assert.equal(reveal.props.disabled, false, 'pin header reveal is disabled for an active pin')
+    reveal.props.onClick()
+
+    const rendered = harness.render()
+    assert.equal(flatten(rendered).find(node => hasClass(node, 'ccm-browser-root-path')).props.title, '/elsewhere/deep',
+      'revealing an outside pin did not move visibleRoot')
+    assert.match(textOf(flatten(rendered).find(node => hasClass(node, 'ccm-browser-scope-summary'))),
+      /Subtree.*\/elsewhere\/deep/, 'outside reveal did not retain subtree scope')
+    assert.equal(hasClass(findPinRow(rendered, '/elsewhere/deep'), 'ccm-browser-pin-row-active'), true,
+      'outside reveal cleared the active pin')
+  } finally {
+    harness.cleanup()
+  }
+})
+
+test('pin row click and keyboard behavior switches between activation and selection with edit mode', async () => {
+  const harness = await mountPins({
+    pinsByAgent: {
+      'claude-code': [
+        { path: '/one', addedAt: 1, exists: true },
+        { path: '/two', addedAt: 2, exists: true },
+      ],
+      codex: [],
+    },
+  })
+  try {
+    findPinRow(harness.render(), '/one').props.onClick()
+    assert.match(textOf(flatten(harness.render()).find(node => hasClass(node, 'ccm-browser-scope-summary'))),
+      /Exact directory.*\/one/, 'normal-mode row click did not activate the pin')
+
+    let nodes = flatten(harness.render())
+    nodes.find(node => node?.tag === 'button' && node.props?.title === dictionaries.en['pin-edit-mode']).props.onClick()
+    const editRow = findPinRow(harness.render(), '/two')
+    assert.equal(typeof editRow.props.onClick, 'function', 'select-mode pin row has no click handler')
+    editRow.props.onClick({ shiftKey: false })
+    let checkbox = flatten(harness.render()).find(node => node?.tag === 'input' && node.props?.['aria-label'] === 'Select two')
+    assert.equal(checkbox.props.checked, true, 'select-mode row click did not toggle the checkbox on')
+    assert.match(textOf(flatten(harness.render()).find(node => hasClass(node, 'ccm-browser-scope-summary'))),
+      /Exact directory.*\/one/, 'select-mode row click activated the pin')
+    findPinRow(harness.render(), '/two').props.onClick({ shiftKey: false })
+    checkbox = flatten(harness.render()).find(node => node?.tag === 'input' && node.props?.['aria-label'] === 'Select two')
+    assert.equal(checkbox.props.checked, false, 'select-mode row click did not toggle the checkbox off')
+
+    const keyboardRow = findPinRow(harness.render(), '/two')
+    const target = {}
+    keyboardRow.props.onKeydown({ key: ' ', target, currentTarget: target, shiftKey: false, preventDefault() {} })
+    checkbox = flatten(harness.render()).find(node => node?.tag === 'input' && node.props?.['aria-label'] === 'Select two')
+    assert.equal(checkbox.props.checked, true, 'select-mode Space did not toggle the checkbox')
+
+    nodes = flatten(harness.render())
+    nodes.find(node => node?.tag === 'button' && node.props?.title === dictionaries.en['pin-edit-mode']).props.onClick()
+    const normalRow = findPinRow(harness.render(), '/two')
+    normalRow.props.onKeydown({ key: 'Enter', target: normalRow, currentTarget: normalRow, shiftKey: false, preventDefault() {} })
+    assert.match(textOf(flatten(harness.render()).find(node => hasClass(node, 'ccm-browser-scope-summary'))),
+      /Exact directory.*\/two/, 'normal-mode Enter did not activate the pin')
+  } finally {
+    harness.cleanup()
+  }
+})
+
 test('pin rows use exact match-key metadata and activation sets exact scope with a pin-specific empty state', async () => {
   const pins = [
     { path: '/work', addedAt: 1, exists: true },
@@ -273,8 +461,8 @@ test('pin rows use exact match-key metadata and activation sets exact scope with
   })
   try {
     let nodes = flatten(harness.render())
-    const workRow = nodes.find(node => node?.tag === 'button' && hasClass(node, 'ccm-browser-pin-row') && node.props.title === '/work')
-    const aliasRow = nodes.find(node => node?.tag === 'button' && hasClass(node, 'ccm-browser-pin-row') && node.props.title === '/Canonical/É')
+    const workRow = findPinRow(nodes, '/work')
+    const aliasRow = findPinRow(nodes, '/Canonical/É')
     assert.match(textOf(workRow), /1 session/)
     assert.doesNotMatch(textOf(workRow), /2 sessions/)
     assert.match(textOf(aliasRow), /1 session/)
@@ -286,7 +474,7 @@ test('pin rows use exact match-key metadata and activation sets exact scope with
     assert.match(cards, /exact-session/)
     assert.doesNotMatch(cards, /descendant-session/)
 
-    nodes.find(node => node?.tag === 'button' && hasClass(node, 'ccm-browser-pin-row') && node.props.title === '/empty').props.onClick()
+    findPinRow(nodes, '/empty').props.onClick()
     const rendered = textOf(harness.render())
     assert.match(rendered, /This pinned folder has no sessions for this view\./)
     assert.doesNotMatch(rendered, /No Active sessions match these filters\./)
@@ -476,7 +664,7 @@ test('a successful no-op mutation reloads pins changed concurrently while the co
   })
   try {
     let nodes = flatten(harness.render())
-    nodes.find(node => node?.tag === 'button' && hasClass(node, 'ccm-browser-pin-row') && node.props.title === '/work').props.onClick()
+    findPinRow(nodes, '/work').props.onClick()
     nodes = flatten(harness.render())
     const callStart = harness.calls.length
     nodes.find(node => node?.tag === 'button'
@@ -487,7 +675,7 @@ test('a successful no-op mutation reloads pins changed concurrently while the co
     slowRemove.resolve()
     await flush(8)
     const pinPaths = flatten(harness.render())
-      .filter(node => node?.tag === 'button' && hasClass(node, 'ccm-browser-pin-row'))
+      .filter(node => hasClass(node, 'ccm-browser-pin-row'))
       .map(node => node.props.title)
     assert.deepEqual(pinPaths, ['/concurrent-pin'])
     assert.ok(harness.calls.slice(callStart).some(args => args[0] === 'list-pins'))
@@ -584,7 +772,7 @@ test('a stale add completion reconciles the agent that is current after switchin
     slowAdd.resolve({ canonicalPath: '/late-agent-a-pin', outcome: 'applied' })
     await flush(10)
     const pinPaths = flatten(harness.render())
-      .filter(node => node?.tag === 'button' && hasClass(node, 'ccm-browser-pin-row'))
+      .filter(node => hasClass(node, 'ccm-browser-pin-row'))
       .map(node => node.props.title)
     assert.deepEqual(pinPaths, ['/late-agent-a-pin'])
     const aLists = harness.calls.slice(callStart)
@@ -659,7 +847,9 @@ test('collapsing pinned folders hides rows, selection, arrows, and both edit too
     assert.equal(sectionNodes.some(node => hasClass(node, 'ccm-browser-pin-move')), false)
     assert.equal(sectionNodes.some(node => hasClass(node, 'ccm-browser-pin-select-bar')), false)
     assert.equal(sectionNodes.some(node => hasClass(node, 'ccm-browser-pin-toolbar')), false)
-    assert.deepEqual(sectionNodes.filter(node => node?.tag === 'button').map(node => node.props.title), ['Expand pinned folders'])
+    const headerButtons = sectionNodes.filter(node => node?.tag === 'button')
+    assert.deepEqual(headerButtons.map(node => node.props.title), ['Reveal in tree', 'Expand pinned folders'])
+    assert.equal(headerButtons[0].props.disabled, true, 'collapsed header reveal is enabled without an active pin')
     assert.equal(harness.storage.get('pinsCollapsed'), true)
   } finally {
     harness.cleanup()
@@ -713,6 +903,10 @@ test('every rendered pin key is localized in English and Chinese with complete d
   const uiSource = fs.readFileSync(path.resolve(__dirname, '../src/ui.ts'), 'utf8')
   const usedKeys = [...new Set([...uiSource.matchAll(/t\(\s*['"](pin-[^'"]+|pinned-folders)['"]/g)].map(match => match[1]))]
   assert.ok(usedKeys.length > 0)
+  assert.equal(dictionaries.en['pinned-folders'], 'Pinned folders', 'English pinned-folders wording changed')
+  assert.equal(dictionaries.zh['pinned-folders'], '置顶目录', 'Chinese pinned-folders wording was not renamed')
+  assert.equal(Object.values(dictionaries.zh).some(value => value.includes('固定目录')), false,
+    'a Chinese pinned-folder string still uses 固定目录')
   for (const key of usedKeys) {
     assert.equal(typeof dictionaries.en[key], 'string', key)
     assert.equal(typeof dictionaries.zh[key], 'string', key)
@@ -771,9 +965,7 @@ test('a symlink-added pin still matches sessions after a cold load from list-pin
         : undefined,
     })
     try {
-      const pinRow = flatten(harness.render()).find(node => node?.tag === 'button'
-        && hasClass(node, 'ccm-browser-pin-row')
-        && node.props.title === canonicalPath)
+      const pinRow = findPinRow(harness.render(), canonicalPath)
       assert.ok(pinRow)
       assert.match(textOf(pinRow), /1 session/)
       assert.equal(harness.calls.some(args => args[0] === 'add-pin'), false)
