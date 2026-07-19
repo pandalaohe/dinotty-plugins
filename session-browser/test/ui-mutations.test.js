@@ -470,6 +470,7 @@ test('all export CLI error codes use their localized taxonomy in single and bulk
       const rendered = textOf(single.plugin.component.render())
       assert.doesNotMatch(rendered, /RAW CLI|\/raw\/noise\/path/)
       assert.doesNotMatch(rendered, /unexpected error/i)
+      assert.doesNotMatch(rendered, /export-error-[a-z-]+/)
     } finally {
       single.cleanup()
     }
@@ -484,6 +485,7 @@ test('all export CLI error codes use their localized taxonomy in single and bulk
       const rendered = textOf(bulk.plugin.component.render())
       assert.doesNotMatch(rendered, /RAW CLI|\/raw\/noise\/path/)
       assert.doesNotMatch(rendered, /unexpected error/i)
+      assert.doesNotMatch(rendered, /export-error-[a-z-]+/)
     } finally {
       bulk.cleanup()
     }
@@ -838,7 +840,6 @@ test('bulk export splits one attribution across roots and shares the run timesta
       exportDestination: '/exports',
       run: async args => {
         calls.push(args)
-        if (args[0] === 'build-index') return { code: 0, stdout: '[]', stderr: '' }
         return {
           code: 0,
           stdout: JSON.stringify({ ok: true, path: '/exports/session.md' }),
@@ -919,7 +920,6 @@ test('bulk export disambiguates project names that differ only by case', async (
     exportDestination: '/exports',
     run: async args => {
       calls.push(args)
-      if (args[0] === 'build-index') return { code: 0, stdout: '[]', stderr: '' }
       return {
         code: 0,
         stdout: JSON.stringify({ ok: true, path: '/exports/session.md' }),
@@ -946,7 +946,6 @@ test('bulk export caps multibyte project segments without splitting characters',
     exportDestination: '/exports',
     run: async args => {
       calls.push(args)
-      if (args[0] === 'build-index') return { code: 0, stdout: '[]', stderr: '' }
       return { code: 0, stdout: JSON.stringify({ ok: true, path: '/exports/session.md' }), stderr: '' }
     },
   })
@@ -972,7 +971,6 @@ test('bulk export rechecks project-name legality after byte truncation', async (
     exportDestination: '/exports',
     run: async args => {
       calls.push(args)
-      if (args[0] === 'build-index') return { code: 0, stdout: '[]', stderr: '' }
       return { code: 0, stdout: JSON.stringify({ ok: true, path: '/exports/session.md' }), stderr: '' }
     },
   })
@@ -996,7 +994,6 @@ test('bulk export legalizes its fallback when the sanitized project name is empt
     unknownProjectName: 'CON.',
     run: async args => {
       calls.push(args)
-      if (args[0] === 'build-index') return { code: 0, stdout: '[]', stderr: '' }
       return { code: 0, stdout: JSON.stringify({ ok: true, path: '/exports/session.md' }), stderr: '' }
     },
   })
@@ -1037,7 +1034,6 @@ test('bulk export success resets the consecutive-failure guard', async () => {
     items,
     run: async args => {
       calls.push(args)
-      if (args[0] === 'build-index') return { code: 0, stdout: '[]', stderr: '' }
       const succeeds = exportIndex++ === 2
       return succeeds
         ? { code: 0, stdout: JSON.stringify({ ok: true, path: '/exports/session.md' }), stderr: '' }
@@ -1069,7 +1065,6 @@ test('bulk export cancellation stops before issuing the next session export', as
     exportDestination: '/exports',
     run: async args => {
       calls.push(args)
-      if (args[0] === 'build-index') return { code: 0, stdout: '[]', stderr: '' }
       cancelled = true
       return {
         code: 0,
@@ -1095,7 +1090,6 @@ test('bulk export cancellation during the fifth consecutive failure wins over ea
     action: 'export',
     items,
     run: async args => {
-      if (args[0] === 'build-index') return { code: 0, stdout: '[]', stderr: '' }
       exportCount += 1
       if (exportCount === 5) cancelled = true
       return { code: 1, stdout: '', stderr: 'export failed' }

@@ -31,7 +31,9 @@ On dinotty builds that provide `createTerminalTab`, Resume opens a real terminal
 
 Export writes a session's transcript to a Markdown file. A single export produces one flat file at `<destination>/<agent>_exp/single files/<yymmdd>_<title>.md`; a bulk export groups the selected sessions by project under a per-run timestamp at `<destination>/<agent>_exp/<timestamp>/<project>/`.
 
-The destination root defaults to `~/Downloads` and is chosen through the plugin's own folder browser, since the plugin host exposes no file-picker bridge. Choosing a destination outside the home directory requires an explicit confirmation. Files are published atomically, and filenames are sanitised and capped at 255 bytes, so a long or awkward session title yields a shortened name rather than a failure.
+The destination root defaults to `~/Downloads` and is chosen through the plugin's own folder browser, since the plugin host exposes no file-picker bridge. Choosing a destination outside the home directory requires an explicit confirmation.
+
+An export is written to a temporary file and then hard-linked into place, so an interrupted export cannot leave a half-written file under the final name. Filesystems without hard-link support fall back to a rename, which leaves a brief window where the destination file exists but is still empty. Filenames are sanitised and capped at 255 bytes, so a long or awkward session title yields a shortened name rather than a failure.
 
 ## Archive semantics
 
