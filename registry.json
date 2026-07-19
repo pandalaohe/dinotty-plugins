@@ -90,6 +90,19 @@
       "subdir": "session-browser",
       "author": "dinotty",
       "homepage": "https://github.com/xichan96/dinotty-plugins/tree/main/session-browser"
+    },
+    {
+      "id": "volc-ark-quota",
+      "name": "Volcano Ark Quota",
+      "description": "Display Volcano Engine Ark Flow Plan quota (5h / daily / weekly / monthly) in the status bar",
+      "description_zh": "在状态栏展示火山引擎 Ark Flow Plan 配额（5小时 / 日 / 周 / 月）",
+      "version": "0.1.0",
+      "icon": "gauge",
+      "repo": "xichan96/dinotty-plugins",
+      "branch": "main",
+      "subdir": "volc-ark-quota",
+      "author": "dinotty",
+      "homepage": "https://github.com/xichan96/dinotty-plugins/tree/main/volc-ark-quota"
     }
   ]
 }

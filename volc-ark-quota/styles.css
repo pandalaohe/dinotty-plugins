@@ -1,0 +1,230 @@
+/* Config page */
+
+.volc-config {
+  padding: 20px;
+  max-width: 720px;
+  margin: 0 auto;
+  color: var(--fg, #ccc);
+  font-size: 13px;
+}
+
+.volc-header {
+  margin-bottom: 20px;
+}
+
+.volc-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 6px;
+  color: var(--fg-bright, #fff);
+}
+
+.volc-subtitle {
+  color: var(--fg-muted, #888);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.volc-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.volc-meta {
+  color: var(--fg-muted, #888);
+  font-size: 11px;
+}
+
+.volc-error-text {
+  color: var(--danger, #f44747);
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.volc-btn {
+  background: var(--bg-input, #2a2a2c);
+  color: var(--fg, #ccc);
+  border: 1px solid var(--border, #3c3c3c);
+  padding: 6px 10px;
+  border-radius: var(--radius, 4px);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.volc-btn:hover {
+  background: var(--bg-hover, #333335);
+  border-color: var(--accent, #8a8a8a);
+}
+
+.volc-btn-primary {
+  background: var(--accent, #8a8a8a);
+  color: var(--bg, #1a1a2e);
+  border-color: var(--accent, #8a8a8a);
+  font-weight: 500;
+}
+
+.volc-btn-primary:hover {
+  filter: brightness(1.1);
+}
+
+.volc-btn-small {
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
+.volc-btn-danger:hover {
+  color: var(--danger, #f44747);
+  border-color: var(--danger, #f44747);
+}
+
+.volc-account-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.volc-account-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--bg-surface, #1e1e20);
+  border: 1px solid var(--border, #3c3c3c);
+  border-radius: var(--radius, 4px);
+}
+
+.volc-account-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.volc-account-label {
+  font-weight: 500;
+  color: var(--fg-bright, #fff);
+  font-size: 13px;
+}
+
+.volc-account-ak {
+  font-size: 11px;
+  color: var(--fg-muted, #888);
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+.volc-account-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.volc-badge {
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.volc-badge-active {
+  background: rgba(52, 211, 153, 0.15);
+  color: #34d399;
+}
+
+.volc-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--fg-muted, #888);
+  background: var(--bg-surface, #1e1e20);
+  border: 1px dashed var(--border, #3c3c3c);
+  border-radius: var(--radius, 4px);
+}
+
+.volc-edit-form {
+  background: var(--bg-surface, #1e1e20);
+  border: 1px solid var(--border, #3c3c3c);
+  border-radius: var(--radius, 4px);
+  padding: 16px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.volc-form-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.volc-form-row label {
+  width: 120px;
+  flex-shrink: 0;
+  color: var(--fg-muted, #888);
+  font-size: 12px;
+}
+
+.volc-form-row input {
+  flex: 1;
+  background: var(--bg-input, #2a2a2c);
+  color: var(--fg, #ccc);
+  border: 1px solid var(--border, #3c3c3c);
+  border-radius: var(--radius, 4px);
+  padding: 6px 10px;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.volc-form-row input:focus {
+  outline: none;
+  border-color: var(--accent, #8a8a8a);
+}
+
+.volc-form-row .volc-btn-small {
+  flex-shrink: 0;
+}
+
+.volc-form-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.volc-help {
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--bg-surface, #1e1e20);
+  border: 1px solid var(--border, #3c3c3c);
+  border-radius: var(--radius, 4px);
+}
+
+.volc-help summary {
+  cursor: pointer;
+  color: var(--fg-muted, #888);
+  font-size: 12px;
+  user-select: none;
+}
+
+.volc-help p {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--fg-muted, #888);
+  line-height: 1.5;
+}
+
+.volc-help a {
+  color: var(--accent, #8a8a8a);
+}
+
+.volc-help code {
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 11px;
+  background: var(--bg-input, #2a2a2c);
+  padding: 2px 4px;
+  border-radius: 2px;
+  word-break: break-all;
+}
