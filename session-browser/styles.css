@@ -114,6 +114,14 @@
   background: var(--ccm-bg-surface);
 }
 
+.ccm-browser-tree-pane-main {
+  display: flex;
+  min-height: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .ccm-browser-list-pane {
   min-width: calc(280px * var(--ccm-fs, 1));
   flex: 0 0 auto;
@@ -398,10 +406,12 @@
 
 .ccm-browser-pins-header {
   display: flex;
-  min-height: 32px;
+  min-height: 40px;
   align-items: center;
-  gap: 5px;
-  padding: 0 7px 0 10px;
+  gap: 8px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--ccm-border);
+  background: var(--ccm-bg-surface);
   flex-shrink: 0;
   color: var(--ccm-text-muted);
 }
@@ -411,9 +421,11 @@
   flex: 1;
   overflow: hidden;
   color: var(--ccm-text-bright);
-  font-size: calc(11px * var(--ccm-fs, 1));
+  font-size: calc(12px * var(--ccm-fs, 1));
   font-weight: 600;
+  letter-spacing: 0.02em;
   text-overflow: ellipsis;
+  text-transform: uppercase;
   white-space: nowrap;
 }
 
@@ -422,6 +434,12 @@
   min-width: 24px;
   height: 24px;
   padding: 4px;
+}
+
+.ccm-browser-pins-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .ccm-browser-pins-body {
@@ -463,13 +481,19 @@
   outline: none;
 }
 
-.ccm-browser-pin-row:disabled {
+.ccm-browser-pin-row[aria-disabled='true'] {
   cursor: default;
   opacity: 0.55;
 }
 
 .ccm-browser-pin-row-edit {
-  cursor: default;
+  cursor: pointer;
+}
+
+.ccm-browser-pin-row-active {
+  border-left-color: var(--ccm-accent);
+  background: var(--ccm-accent-bg);
+  color: var(--ccm-text);
 }
 
 .ccm-browser-pin-row-edit input {

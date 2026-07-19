@@ -15,6 +15,7 @@ var ICON_PATHS = {
   "arrow-left": [["path", { d: "m12 19-7-7 7-7" }], ["path", { d: "M19 12H5" }]],
   "arrow-up": [["path", { d: "m18 15-6-6-6 6" }]],
   "arrow-down": [["path", { d: "m6 9 6 6 6-6" }]],
+  "corner-up-right": [["path", { d: "M7 17 17 7" }], ["path", { d: "M7 7h10v10" }]],
   send: [
     ["path", { d: "M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" }],
     ["path", { d: "m21.854 2.147-10.94 10.939" }]
@@ -167,6 +168,9 @@ function IconArrowUp(size) {
 }
 function IconArrowDown(size) {
   return renderIcon(ICON_PATHS["arrow-down"], size);
+}
+function IconCornerUpRight(size) {
+  return renderIcon(ICON_PATHS["corner-up-right"], size);
 }
 function IconCopy(size) {
   return renderIcon(ICON_PATHS.copy, size);
@@ -416,6 +420,7 @@ var dictionaries = {
     "pin-mutation-failed": "Could not update pinned folders.",
     "pin-no-sessions": "This pinned folder has no sessions for this view.",
     "pin-promote-selected": "Promote {n}",
+    "pin-reveal-in-tree": "Reveal in tree",
     "pin-remove-selected": "Remove {n}",
     "pin-reset-list": "Reset pinned folders",
     "pin-select-folder": "Select {name}",
@@ -671,31 +676,32 @@ var dictionaries = {
     "picker-select-current": '\u9009\u62E9"{name}"\u4F5C\u4E3A\u5DE5\u4F5C\u533A\u6811\u8D77\u59CB\u76EE\u5F55',
     "picker-title": "\u9009\u62E9\u76EE\u5F55\u6811\u6839\u76EE\u5F55",
     "picker-use-manual-path": "\u9009\u62E9\u8F93\u5165\u7684\u8DEF\u5F84\u4F5C\u4E3A\u5DE5\u4F5C\u533A\u6811\u8D77\u59CB\u76EE\u5F55",
-    "pin-collapse-persist-warning": "\u65E0\u6CD5\u9A8C\u8BC1\u5DF2\u4FDD\u5B58\u7684\u56FA\u5B9A\u76EE\u5F55\u6298\u53E0\u8BBE\u7F6E\u3002",
-    "pin-collapse-section": "\u6298\u53E0\u56FA\u5B9A\u76EE\u5F55",
+    "pin-collapse-persist-warning": "\u65E0\u6CD5\u9A8C\u8BC1\u5DF2\u4FDD\u5B58\u7684\u7F6E\u9876\u76EE\u5F55\u6298\u53E0\u8BBE\u7F6E\u3002",
+    "pin-collapse-section": "\u6298\u53E0\u7F6E\u9876\u76EE\u5F55",
     "pin-current-folder-add": "\u56FA\u5B9A\u6240\u9009\u76EE\u5F55",
     "pin-current-folder-remove": "\u53D6\u6D88\u56FA\u5B9A\u6240\u9009\u76EE\u5F55",
-    "pin-edit-mode": "\u7F16\u8F91\u56FA\u5B9A\u76EE\u5F55",
+    "pin-edit-mode": "\u7F16\u8F91\u7F6E\u9876\u76EE\u5F55",
     "pin-empty-onboarding": "\u56FA\u5B9A\u6240\u9009\u76EE\u5F55\uFF0C\u4EE5\u4FBF\u968F\u65F6\u8BBF\u95EE\u3002",
-    "pin-expand-section": "\u5C55\u5F00\u56FA\u5B9A\u76EE\u5F55",
+    "pin-expand-section": "\u5C55\u5F00\u7F6E\u9876\u76EE\u5F55",
     "pin-folder-missing": "\u76EE\u5F55\u5DF2\u4E0D\u5B58\u5728",
-    "pin-invalid-response": "\u56FA\u5B9A\u76EE\u5F55\u8FD4\u56DE\u4E86\u65E0\u6548\u54CD\u5E94\u3002",
+    "pin-invalid-response": "\u7F6E\u9876\u76EE\u5F55\u8FD4\u56DE\u4E86\u65E0\u6548\u54CD\u5E94\u3002",
     "pin-last-activity": "\u6700\u540E\u6D3B\u52A8 {time}",
-    "pin-list-changed": "\u56FA\u5B9A\u76EE\u5F55\u5DF2\u5728\u53E6\u4E00\u4E2A\u7A97\u53E3\u4E2D\u66F4\u6539\u3002",
-    "pin-list-load-failed": "\u65E0\u6CD5\u52A0\u8F7D\u56FA\u5B9A\u76EE\u5F55\u3002",
-    "pin-list-loading": "\u6B63\u5728\u52A0\u8F7D\u56FA\u5B9A\u76EE\u5F55\u2026",
-    "pin-list-unreadable": "\u65E0\u6CD5\u8BFB\u53D6\u56FA\u5B9A\u76EE\u5F55\u3002\u5148\u524D\u7684\u5217\u8868\u5DF2\u4FDD\u5B58\u5728 {path}\u3002",
+    "pin-list-changed": "\u7F6E\u9876\u76EE\u5F55\u5DF2\u5728\u53E6\u4E00\u4E2A\u7A97\u53E3\u4E2D\u66F4\u6539\u3002",
+    "pin-list-load-failed": "\u65E0\u6CD5\u52A0\u8F7D\u7F6E\u9876\u76EE\u5F55\u3002",
+    "pin-list-loading": "\u6B63\u5728\u52A0\u8F7D\u7F6E\u9876\u76EE\u5F55\u2026",
+    "pin-list-unreadable": "\u65E0\u6CD5\u8BFB\u53D6\u7F6E\u9876\u76EE\u5F55\u3002\u5148\u524D\u7684\u5217\u8868\u5DF2\u4FDD\u5B58\u5728 {path}\u3002",
     "pin-move-down": "\u4E0B\u79FB {name}",
     "pin-move-up": "\u4E0A\u79FB {name}",
-    "pin-mutation-failed": "\u65E0\u6CD5\u66F4\u65B0\u56FA\u5B9A\u76EE\u5F55\u3002",
-    "pin-no-sessions": "\u6B64\u56FA\u5B9A\u76EE\u5F55\u5728\u5F53\u524D\u89C6\u56FE\u4E2D\u6CA1\u6709\u4F1A\u8BDD\u3002",
+    "pin-mutation-failed": "\u65E0\u6CD5\u66F4\u65B0\u7F6E\u9876\u76EE\u5F55\u3002",
+    "pin-no-sessions": "\u6B64\u7F6E\u9876\u76EE\u5F55\u5728\u5F53\u524D\u89C6\u56FE\u4E2D\u6CA1\u6709\u4F1A\u8BDD\u3002",
     "pin-promote-selected": "\u7F6E\u9876 {n} \u4E2A",
+    "pin-reveal-in-tree": "\u5728\u6587\u4EF6\u6811\u4E2D\u663E\u793A",
     "pin-remove-selected": "\u79FB\u9664 {n} \u4E2A",
-    "pin-reset-list": "\u91CD\u7F6E\u56FA\u5B9A\u76EE\u5F55",
+    "pin-reset-list": "\u91CD\u7F6E\u7F6E\u9876\u76EE\u5F55",
     "pin-select-folder": "\u9009\u62E9 {name}",
     "pin-session-count-one": "{n} \u4E2A\u4F1A\u8BDD",
     "pin-session-count-other": "{n} \u4E2A\u4F1A\u8BDD",
-    "pinned-folders": "\u56FA\u5B9A\u76EE\u5F55",
+    "pinned-folders": "\u7F6E\u9876\u76EE\u5F55",
     "picker-export-manual-path": "\u624B\u52A8\u8F93\u5165\u7EDD\u5BF9\u5BFC\u51FA\u4F4D\u7F6E\u8DEF\u5F84",
     "picker-export-select-current": "\u9009\u62E9\u201C{name}\u201D\u4F5C\u4E3A\u5BFC\u51FA\u4F4D\u7F6E",
     "picker-export-title": "\u9009\u62E9\u5BFC\u51FA\u4F4D\u7F6E",
@@ -3173,15 +3179,34 @@ function activate(ctx) {
     if (pinsBulkRunning.value) return;
     if (activeMount) activeMount.treeGeneration++;
     clearSearchOverlay();
-    visibleRoot.value = pin.path;
     committedSelection.value = { path: pin.path, mode: "exact", sessionId: null };
     updatePinsState({ activePath: pin.path });
     applyFilterChange();
     resetTranscript();
-    expandedPaths.value = new Set(expandedPaths.value).add(pin.path);
-    persist(perAgentStorageKey(STORAGE_KEYS.treeRoot), pin.path);
-    persistExpandedPaths();
     if (compactMode.value) compactView.value = "list";
+  }
+  function revealActivePinInTree() {
+    const state = pinsSelection.value;
+    const activePath = state.activePath;
+    if (!activePath || state.loading || pinsBulkRunning.value || state.corruptSidecar) return;
+    clearSearchOverlay();
+    committedSelection.value = { path: activePath, mode: "subtree", sessionId: null };
+    const nextExpanded = new Set(expandedPaths.value);
+    let ancestor = parentPath(activePath);
+    while (true) {
+      nextExpanded.add(ancestor);
+      if (ancestor === "/") break;
+      ancestor = parentPath(ancestor);
+    }
+    expandedPaths.value = nextExpanded;
+    persistExpandedPaths();
+    if (!isPathWithin(visibleRoot.value, activePath)) {
+      setVisibleRoot(activePath);
+      updatePinsState({ activePath });
+    }
+    applyFilterChange();
+    resetTranscript();
+    if (compactMode.value) compactView.value = "tree";
   }
   function pinMetadata(pin) {
     const keys = pinMatchKeys(pin);
@@ -3197,29 +3222,37 @@ function activate(ctx) {
     const count = t(metadata.count === 1 ? "pin-session-count-one" : "pin-session-count-other", { n: metadata.count });
     const activity = t("pin-last-activity", { time: formatRelativeTime(metadata.lastActiveAt, t) });
     const missingTitle = pin.exists ? pin.path : t("pin-folder-missing");
-    if (!pinsSelectMode.value) {
-      return h("button", {
-        class: ["ccm-browser-pin-row", !pin.exists ? "ccm-browser-pin-row-missing" : ""],
-        type: "button",
-        key: pin.path,
-        title: missingTitle,
-        disabled: pinsBulkRunning.value,
-        onClick: () => activatePin(pin)
-      }, [
-        IconFolder(14),
-        h("span", { class: "ccm-browser-pin-name" }, name),
-        h("span", { class: "ccm-browser-pin-meta" }, [
-          h("span", {}, count),
-          h("span", {}, activity)
-        ])
-      ]);
-    }
+    const activePath = pinsSelection.value.activePath;
+    const active = activePath !== null && normalizePath(pin.path) === normalizePath(activePath);
+    const activateOrToggle = (shiftKey = false) => {
+      if (pinsBulkRunning.value) return;
+      if (pinsSelectMode.value) {
+        reducePinsSelection(shiftKey ? { type: "shift-range", key: pin.path, pageKeys: pinPaths() } : { type: "toggle", key: pin.path });
+      } else {
+        activatePin(pin);
+      }
+    };
     return h("div", {
-      class: ["ccm-browser-pin-row", "ccm-browser-pin-row-edit", !pin.exists ? "ccm-browser-pin-row-missing" : ""],
+      class: [
+        "ccm-browser-pin-row",
+        pinsSelectMode.value ? "ccm-browser-pin-row-edit" : "",
+        !pin.exists ? "ccm-browser-pin-row-missing" : "",
+        active ? "ccm-browser-pin-row-active" : ""
+      ],
       key: pin.path,
-      title: missingTitle
+      title: missingTitle,
+      role: "button",
+      tabindex: pinsBulkRunning.value ? -1 : 0,
+      "aria-disabled": pinsBulkRunning.value,
+      "aria-current": active ? "true" : void 0,
+      onClick: (event) => activateOrToggle(Boolean(event?.shiftKey)),
+      onKeydown: (event) => {
+        if (event.target !== event.currentTarget || event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        activateOrToggle(event.shiftKey);
+      }
     }, [
-      h("input", {
+      pinsSelectMode.value ? h("input", {
         type: "checkbox",
         checked: pinsSelection.value.selected.has(pin.path),
         disabled: pinsBulkRunning.value,
@@ -3228,33 +3261,40 @@ function activate(ctx) {
           event.stopPropagation();
           reducePinsSelection(event.shiftKey ? { type: "shift-range", key: pin.path, pageKeys: pinPaths() } : { type: "toggle", key: pin.path });
         }
-      }),
+      }) : null,
       IconFolder(14),
       h("span", { class: "ccm-browser-pin-name" }, name),
       h("span", { class: "ccm-browser-pin-meta" }, [
         h("span", {}, count),
         h("span", {}, activity)
       ]),
-      h("button", {
+      pinsSelectMode.value ? h("button", {
         class: "ccm-icon-btn ccm-browser-pin-move",
         type: "button",
         title: t("pin-move-up", { name }),
         "aria-label": t("pin-move-up", { name }),
         disabled: pinsBulkRunning.value || index === 0,
-        onClick: () => enqueuePinMutation({ type: "move", path: pin.path, direction: "up" })
-      }, [IconArrowUp(13)]),
-      h("button", {
+        onClick: (event) => {
+          event?.stopPropagation();
+          enqueuePinMutation({ type: "move", path: pin.path, direction: "up" });
+        }
+      }, [IconArrowUp(13)]) : null,
+      pinsSelectMode.value ? h("button", {
         class: "ccm-icon-btn ccm-browser-pin-move",
         type: "button",
         title: t("pin-move-down", { name }),
         "aria-label": t("pin-move-down", { name }),
         disabled: pinsBulkRunning.value || index === pinsSelection.value.pins.length - 1,
-        onClick: () => enqueuePinMutation({ type: "move", path: pin.path, direction: "down" })
-      }, [IconArrowDown(13)])
+        onClick: (event) => {
+          event?.stopPropagation();
+          enqueuePinMutation({ type: "move", path: pin.path, direction: "down" });
+        }
+      }, [IconArrowDown(13)]) : null
     ]);
   }
   function renderPinsSection() {
     const state = pinsSelection.value;
+    const headerControlsDisabled = state.loading || pinsBulkRunning.value || Boolean(state.corruptSidecar);
     const allSelected = state.pins.length > 0 && state.pins.every((pin) => state.selected.has(pin.path));
     const selectedPins = state.pins.filter((pin) => state.selected.has(pin.path));
     return h("section", { class: ["ccm-browser-pins-section", state.collapsed ? "ccm-browser-pins-collapsed" : ""] }, [
@@ -3262,31 +3302,42 @@ function activate(ctx) {
         IconPin(14),
         h("span", { class: "ccm-browser-pins-title" }, t("pinned-folders")),
         h("span", { class: "ccm-browser-pane-count" }, String(state.pins.length)),
-        !state.collapsed ? h("button", {
-          class: ["ccm-icon-btn", pinsSelectMode.value ? "ccm-icon-btn-active" : ""],
-          type: "button",
-          title: t("pin-edit-mode"),
-          "aria-label": t("pin-edit-mode"),
-          "aria-pressed": pinsSelectMode.value,
-          disabled: pinsBulkRunning.value || Boolean(state.corruptSidecar),
-          onClick: () => {
-            pinsSelectMode.value = !pinsSelectMode.value;
-            if (!pinsSelectMode.value) reducePinsSelection({ type: "clear-partition" });
-          }
-        }, [IconCheck(14)]) : null,
-        h("button", {
-          class: "ccm-icon-btn",
-          type: "button",
-          title: t(state.collapsed ? "pin-expand-section" : "pin-collapse-section"),
-          "aria-label": t(state.collapsed ? "pin-expand-section" : "pin-collapse-section"),
-          "aria-expanded": !state.collapsed,
-          "aria-pressed": state.collapsed,
-          onClick: () => {
-            const collapsed = !state.collapsed;
-            updatePinsState({ collapsed });
-            void persistPinsCollapsed(collapsed);
-          }
-        }, [state.collapsed ? IconChevronRight(14) : IconChevronDown(14)])
+        h("div", { class: "ccm-browser-pins-controls" }, [
+          !state.collapsed ? h("button", {
+            class: ["ccm-icon-btn", pinsSelectMode.value ? "ccm-icon-btn-active" : ""],
+            type: "button",
+            title: t("pin-edit-mode"),
+            "aria-label": t("pin-edit-mode"),
+            "aria-pressed": pinsSelectMode.value,
+            disabled: headerControlsDisabled,
+            onClick: () => {
+              pinsSelectMode.value = !pinsSelectMode.value;
+              if (!pinsSelectMode.value) reducePinsSelection({ type: "clear-partition" });
+            }
+          }, [IconCheck(14)]) : null,
+          h("button", {
+            class: "ccm-icon-btn",
+            type: "button",
+            title: t("pin-reveal-in-tree"),
+            "aria-label": t("pin-reveal-in-tree"),
+            disabled: headerControlsDisabled || !state.activePath,
+            onClick: revealActivePinInTree
+          }, [IconCornerUpRight(14)]),
+          h("button", {
+            class: "ccm-icon-btn",
+            type: "button",
+            title: t(state.collapsed ? "pin-expand-section" : "pin-collapse-section"),
+            "aria-label": t(state.collapsed ? "pin-expand-section" : "pin-collapse-section"),
+            "aria-expanded": !state.collapsed,
+            "aria-pressed": state.collapsed,
+            disabled: headerControlsDisabled,
+            onClick: () => {
+              const collapsed = !state.collapsed;
+              updatePinsState({ collapsed });
+              void persistPinsCollapsed(collapsed);
+            }
+          }, [state.collapsed ? IconChevronRight(14) : IconChevronDown(14)])
+        ])
       ]),
       state.collapsed ? null : h("div", { class: "ccm-browser-pins-body" }, [
         state.conflictNote ? h("div", { class: "ccm-browser-pin-note", role: "status" }, t("pin-list-changed")) : null,
@@ -3385,71 +3436,73 @@ function activate(ctx) {
       class: "ccm-browser-pane ccm-browser-tree-pane",
       style: compactMode.value ? void 0 : { width: `calc(${paneWidths.value.left}px * var(--ccm-fs, 1))` }
     }, [
-      h("div", { class: "ccm-browser-pane-header" }, [
-        h("div", { class: "ccm-browser-pane-title" }, t("workspaces")),
-        h("div", { class: "ccm-browser-pane-actions" }, [
-          compactMode.value ? h("button", {
-            class: "ccm-icon-btn",
-            title: t("compact-back-to-sessions"),
-            "aria-label": t("compact-back-to-sessions"),
-            onClick: () => {
-              compactView.value = "list";
-            }
-          }, [IconChevronLeft(15)]) : null,
-          h("button", {
-            class: ["ccm-icon-btn", pinnedFolder ? "ccm-icon-btn-active" : ""],
-            type: "button",
-            title: t(pinnedFolder ? "pin-current-folder-remove" : "pin-current-folder-add"),
-            "aria-label": t(pinnedFolder ? "pin-current-folder-remove" : "pin-current-folder-add"),
-            "aria-pressed": Boolean(pinnedFolder),
-            disabled: loading.value || pinsSelection.value.loading || pinsBulkRunning.value || Boolean(pinsSelection.value.corruptSidecar) || !committedSelection.value.path,
-            onClick: () => enqueuePinMutation(pinnedFolder ? { type: "remove", paths: [pinnedFolder.path] } : { type: "add", path: committedSelection.value.path })
-          }, [IconPin(15)]),
-          h("button", {
-            class: "ccm-icon-btn",
-            title: t("navigate-parent"),
-            "aria-label": t("navigate-parent"),
-            disabled: loading.value || bulkRunning.value || visibleRoot.value === "/",
-            onClick: () => setVisibleRoot(parentPath(visibleRoot.value))
-          }, [IconArrowLeft(15)]),
-          h("button", {
-            class: ["ccm-icon-btn", committedSelection.value.mode === "exact" ? "ccm-icon-btn-active" : ""],
-            title: t(committedSelection.value.mode === "subtree" ? "scope-exact" : "scope-subtree"),
-            "aria-label": t(committedSelection.value.mode === "subtree" ? "scope-exact" : "scope-subtree"),
-            disabled: bulkRunning.value,
-            onClick: () => {
-              clearSearchOverlay();
-              committedSelection.value = {
-                ...committedSelection.value,
-                mode: committedSelection.value.mode === "subtree" ? "exact" : "subtree",
-                sessionId: null
-              };
-              applyFilterChange();
-            }
-          }, [committedSelection.value.mode === "subtree" ? IconFolder(15) : IconFileText(15)]),
-          h("button", {
-            class: "ccm-icon-btn",
-            title: t("use-selected-folder-as-tree-root"),
-            "aria-label": t("use-selected-folder-as-tree-root"),
-            disabled: loading.value || bulkRunning.value || !committedSelection.value.path || committedSelection.value.path === visibleRoot.value,
-            onClick: () => setVisibleRoot(committedSelection.value.path)
-          }, [IconFolderDown(15)]),
-          h("button", {
-            class: "ccm-icon-btn",
-            title: t("change-tree-root"),
-            "aria-label": t("change-tree-root"),
-            disabled: loading.value || bulkRunning.value,
-            ref: (element) => {
-              pickerTriggerRef.value = element;
-            },
-            onClick: () => openRootPicker("tree-root")
-          }, [IconPencil(15)])
-        ])
-      ]),
-      h("div", { class: "ccm-browser-root-path", title: visibleRoot.value }, visibleRoot.value),
       renderPinsSection(),
-      h("div", { class: "ccm-browser-tree-body" }, [
-        loading.value ? h("div", { class: "ccm-browser-pane-state" }, t("building-index")) : tree.value ? renderTreeNode(tree.value, 0) : h("div", { class: "ccm-browser-pane-state" }, t("no-indexed-sessions"))
+      h("div", { class: "ccm-browser-tree-pane-main" }, [
+        h("div", { class: "ccm-browser-pane-header" }, [
+          h("div", { class: "ccm-browser-pane-title" }, t("workspaces")),
+          h("div", { class: "ccm-browser-pane-actions" }, [
+            compactMode.value ? h("button", {
+              class: "ccm-icon-btn",
+              title: t("compact-back-to-sessions"),
+              "aria-label": t("compact-back-to-sessions"),
+              onClick: () => {
+                compactView.value = "list";
+              }
+            }, [IconChevronLeft(15)]) : null,
+            h("button", {
+              class: ["ccm-icon-btn", pinnedFolder ? "ccm-icon-btn-active" : ""],
+              type: "button",
+              title: t(pinnedFolder ? "pin-current-folder-remove" : "pin-current-folder-add"),
+              "aria-label": t(pinnedFolder ? "pin-current-folder-remove" : "pin-current-folder-add"),
+              "aria-pressed": Boolean(pinnedFolder),
+              disabled: loading.value || pinsSelection.value.loading || pinsBulkRunning.value || Boolean(pinsSelection.value.corruptSidecar) || !committedSelection.value.path,
+              onClick: () => enqueuePinMutation(pinnedFolder ? { type: "remove", paths: [pinnedFolder.path] } : { type: "add", path: committedSelection.value.path })
+            }, [IconPin(15)]),
+            h("button", {
+              class: "ccm-icon-btn",
+              title: t("navigate-parent"),
+              "aria-label": t("navigate-parent"),
+              disabled: loading.value || bulkRunning.value || visibleRoot.value === "/",
+              onClick: () => setVisibleRoot(parentPath(visibleRoot.value))
+            }, [IconArrowLeft(15)]),
+            h("button", {
+              class: ["ccm-icon-btn", committedSelection.value.mode === "exact" ? "ccm-icon-btn-active" : ""],
+              title: t(committedSelection.value.mode === "subtree" ? "scope-exact" : "scope-subtree"),
+              "aria-label": t(committedSelection.value.mode === "subtree" ? "scope-exact" : "scope-subtree"),
+              disabled: bulkRunning.value,
+              onClick: () => {
+                clearSearchOverlay();
+                committedSelection.value = {
+                  ...committedSelection.value,
+                  mode: committedSelection.value.mode === "subtree" ? "exact" : "subtree",
+                  sessionId: null
+                };
+                applyFilterChange();
+              }
+            }, [committedSelection.value.mode === "subtree" ? IconFolder(15) : IconFileText(15)]),
+            h("button", {
+              class: "ccm-icon-btn",
+              title: t("use-selected-folder-as-tree-root"),
+              "aria-label": t("use-selected-folder-as-tree-root"),
+              disabled: loading.value || bulkRunning.value || !committedSelection.value.path || committedSelection.value.path === visibleRoot.value,
+              onClick: () => setVisibleRoot(committedSelection.value.path)
+            }, [IconFolderDown(15)]),
+            h("button", {
+              class: "ccm-icon-btn",
+              title: t("change-tree-root"),
+              "aria-label": t("change-tree-root"),
+              disabled: loading.value || bulkRunning.value,
+              ref: (element) => {
+                pickerTriggerRef.value = element;
+              },
+              onClick: () => openRootPicker("tree-root")
+            }, [IconPencil(15)])
+          ])
+        ]),
+        h("div", { class: "ccm-browser-root-path", title: visibleRoot.value }, visibleRoot.value),
+        h("div", { class: "ccm-browser-tree-body" }, [
+          loading.value ? h("div", { class: "ccm-browser-pane-state" }, t("building-index")) : tree.value ? renderTreeNode(tree.value, 0) : h("div", { class: "ccm-browser-pane-state" }, t("no-indexed-sessions"))
+        ])
       ])
     ]);
   }
