@@ -6,7 +6,12 @@
 > Registry format version: 1
 > Bootstrap date: 2026-07-16
 > Bootstrap upstream commit hash: a2a670fde14419ed116b2afc6ebc9b996123205c  (canonical_base source for D2-origin mods)
-> Last updated: 2026-07-18
+> Last updated: 2026-07-19
+> Lineage note: `custom` was rebuilt on 2026-07-19 directly onto upstream `b44464e`, because
+> three squash merges (PRs #1/#2/#3) had left the old branch carrying 58 commits whose content
+> upstream already held, with a merge-base predating all of them. The pre-rebuild history is
+> preserved at tag `pre-upstream-sync-260719` and branch `custom-preSync`; commit hashes in the
+> "Previously Applied" table below refer to that lineage.
 
 ---
 
@@ -14,9 +19,8 @@
 
 | Commit | File | Area | What | Why | upstreamable | exit-condition | upstream_issue | upstream_pr | status |
 |--------|------|------|------|-----|--------------|----------------|----------------|-------------|--------|
-| 8ea935c | `session-browser/` | plugin | Read-only Claude Code session browser (browse/search/resume/rename/archive-restore; i18n zh/en; 99/99 tests). Originally added at `cc-session-browser/`, then path-renamed in 99ef7ad; diff verification from a2a670f shows 0 lines under the old path and 16,794 under the new path. | Provide a focused history browser/manager without chat functionality | yes | Landed via PR #1; retain for traceability because upstream/main still uses `cc-session-browser/` while this fork renamed the directory to `session-browser/` | n/a | xichan96/dinotty-plugins#1 (merged via 939928c) | merged-upstream |
-| 3f196c6, d720f12, a74b4da, f05243d, ea2ae8e, 2a34fe9 | `session-browser/src/codex-connector.ts`, `src/history-cli.ts`, `src/ui.ts` | feature | Multi-agent support: connector registry normalizing each agent's native storage into one shared session schema, plus a per-connector capability descriptor driving UI affordances. Codex connector reads `~/.codex/state_5.sqlite` read-only via `node:sqlite` `DatabaseSync` (zero runtime deps, never writes the live DB), uses Codex's native title/preview/archived/recency instead of this plugin's Claude-Code-specific index cache, mutates only through the official `codex archive\|unarchive\|delete` CLI, and resumes via `codex resume <id>` in the recorded workspace. UI gains a persistent agent switcher and a set-selected-folder-as-tree-root button. | Make the browser usable for Codex sessions without reimplementing Codex state or inventing a plugin API | yes | Drop the local carry once PR #3 merges | n/a | xichan96/dinotty-plugins#3 (open) | candidate |
-| 99ef7ad, 55e1388 | `session-browser/` | plugin identity | Renames the plugin id and directory from `cc-session-browser` to `session-browser` because it is no longer Claude-Code-only. dinotty's plugin scan requires the directory name to equal the manifest id exactly and keys settings by id, so the CLI copies missing legacy settings forward on first run (copy-if-absent, never overwrites). Fork-local only: root `registry.json` deliberately stays pointed at upstream subdir `cc-session-browser` (repointing it would break that path for this fork); the upstream PR changes `registry.json` instead, because there the rename IS upstream. Intentional residuals: internal `ccm-` CSS prefix (~1075 occurrences, selector churn has no user-visible benefit and real breakage risk) and `CC_SB_*` environment variable names. | Keep the plugin identity aligned with its multi-agent scope | yes | Drop the local carry once PR #3 merges; if upstream declines the rename, re-cut the PR without it and keep this row `private` | n/a | xichan96/dinotty-plugins#3 (open) | candidate |
+| 395ba40 | `session-browser/src/{history-cli,ui,i18n,icons,codex-connector}.ts`, `styles.css`, `README.md`, `test/`, `dist/` | feature | Markdown export for recorded sessions, single and bulk, from the session list and the CLI. Destination root configurable (default `~/Downloads`); outside-home destinations refused unless confirmed. Picker driven by two new read-only CLI subcommands (`list-dirs`, `check-dir`) because the plugin context exposes no file-picker bridge. Filenames capped at 255 bytes with the collision-suffix width reserved inside the budget and the legality pass re-checked after truncation. Publication atomic via hard link. Failures are a localized code taxonomy that structurally cannot surface a raw CLI message. | Let users get transcripts out of the browser without a chat composer or an external tool | yes | Drop the local carry once PR #4 merges | n/a | xichan96/dinotty-plugins#4 (open) | filed |
+| d630ae8 | `.claude/settings.local.json` | hygiene | Untracks the upstream author's personal machine-local Claude settings file. The file itself is left on disk; only the tracking is removed, and this deletion is deliberately excluded from every upstream PR. | A personal editor settings file tracked in a shared repo leaks one contributor's local config to everyone | maybe | Drop if upstream untracks it themselves | candidate | n/a | private |
 
 > ⚠️ `why` 字段由 upstream-update Phase D2 bootstrap 逐条询问 user 填写。
 > 首次生成时可能标为 `why_placeholder_fill_me` — 务必编辑后再跑升级，否则 Phase C triage 质量下降（Per-mod UNCERTAIN 率上升）。
@@ -41,6 +45,9 @@
 
 | What | Status | Notes |
 |------|--------|-------|
+| Read-only session browser plugin (browse/search/resume/rename/archive-restore, i18n zh/en) | merged-upstream | `8ea935c` lineage, merged as PR #1 (`939928c`). Originally added at `cc-session-browser/`. |
+| Resume-session control uses a terminal icon | merged-upstream | `10baa41` lineage, merged as PR #2 (`a1782ed`). |
+| Multi-agent support (connector registry + Codex connector) and the `cc-session-browser` → `session-browser` rename | merged-upstream | `3f196c6`/`99ef7ad` lineage, merged as PR #3 (`b44464e`). The rename landed upstream, so the fork no longer carries a divergent `registry.json`; the rebuilt `custom` takes upstream's copy verbatim. Intentional residuals upstream accepted: internal `ccm-` CSS prefix and `CC_SB_*` environment variable names. |
 
 ## Upgrade Checklist
 
