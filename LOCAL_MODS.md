@@ -6,7 +6,7 @@
 > Registry format version: 1
 > Bootstrap date: 2026-07-16
 > Bootstrap upstream commit hash: a2a670fde14419ed116b2afc6ebc9b996123205c  (canonical_base source for D2-origin mods)
-> Last updated: 2026-07-19
+> Last updated: 2026-07-20
 > Lineage note: `custom` was rebuilt on 2026-07-19 directly onto upstream `b44464e`, because
 > three squash merges (PRs #1/#2/#3) had left the old branch carrying 58 commits whose content
 > upstream already held, with a merge-base predating all of them. The pre-rebuild history is
@@ -20,6 +20,7 @@
 | Commit | File | Area | What | Why | upstreamable | exit-condition | upstream_issue | upstream_pr | status |
 |--------|------|------|------|-----|--------------|----------------|----------------|-------------|--------|
 | 395ba40 | `session-browser/src/{history-cli,ui,i18n,icons,codex-connector}.ts`, `styles.css`, `README.md`, `test/`, `dist/` | feature | Markdown export for recorded sessions, single and bulk, from the session list and the CLI. Destination root configurable (default `~/Downloads`); outside-home destinations refused unless confirmed. Picker driven by two new read-only CLI subcommands (`list-dirs`, `check-dir`) because the plugin context exposes no file-picker bridge. Filenames capped at 255 bytes with the collision-suffix width reserved inside the budget and the legality pass re-checked after truncation. Publication atomic via hard link. Failures are a localized code taxonomy that structurally cannot surface a raw CLI message. | Let users get transcripts out of the browser without a chat composer or an external tool | yes | Drop the local carry once PR #4 merges | n/a | xichan96/dinotty-plugins#4 (open) | filed |
+| bf1f550…995af28 | `session-browser/src/{history-cli,ui,i18n,icons}.ts`, `styles.css`, `test/{pins,pins-ui}.test.js`, `dist/` | feature | Folder pins — pin directories as a peer block above the workspace tree. Clicking a pin scopes the session list without moving the tree; a header Reveal button jumps the tree to the active pin in subtree mode; a checkmark toggle enters edit mode where a whole-row click selects for reorder/removal. Pins persist as content-hash sidecar files written through an atomic-replace path (temp → fsync → rename) with corrupt-sidecar detection and recovery. CLI: `add-pin`/`remove-pins`/`promote-pins`/`list-pins`. | Quick session scoping to frequently-used directories without walking the tree each time | yes | Drop the local carry once PR #5 merges (stacks on #4 — the export commit rides along until #4 merges) | n/a | xichan96/dinotty-plugins#5 (open) | filed |
 | d630ae8 | `.claude/settings.local.json` | hygiene | Untracks the upstream author's personal machine-local Claude settings file. The file itself is left on disk; only the tracking is removed, and this deletion is deliberately excluded from every upstream PR. | A personal editor settings file tracked in a shared repo leaks one contributor's local config to everyone | maybe | Drop if upstream untracks it themselves | candidate | n/a | private |
 
 > ⚠️ `why` 字段由 upstream-update Phase D2 bootstrap 逐条询问 user 填写。
