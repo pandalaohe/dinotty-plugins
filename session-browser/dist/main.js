@@ -15,6 +15,16 @@ var ICON_PATHS = {
   "arrow-left": [["path", { d: "m12 19-7-7 7-7" }], ["path", { d: "M19 12H5" }]],
   "arrow-up": [["path", { d: "m18 15-6-6-6 6" }]],
   "arrow-down": [["path", { d: "m6 9 6 6 6-6" }]],
+  "arrow-up-to-line": [
+    ["path", { d: "M5 3h14" }],
+    ["path", { d: "m18 13-6-6-6 6" }],
+    ["path", { d: "M12 7v14" }]
+  ],
+  "arrow-down-to-line": [
+    ["path", { d: "M12 3v14" }],
+    ["path", { d: "m6 11 6 6 6-6" }],
+    ["path", { d: "M5 21h14" }]
+  ],
   "corner-up-right": [["path", { d: "M7 17 17 7" }], ["path", { d: "M7 7h10v10" }]],
   send: [
     ["path", { d: "M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" }],
@@ -168,6 +178,12 @@ function IconArrowUp(size) {
 }
 function IconArrowDown(size) {
   return renderIcon(ICON_PATHS["arrow-down"], size);
+}
+function IconArrowUpToLine(size) {
+  return renderIcon(ICON_PATHS["arrow-up-to-line"], size);
+}
+function IconArrowDownToLine(size) {
+  return renderIcon(ICON_PATHS["arrow-down-to-line"], size);
 }
 function IconCornerUpRight(size) {
   return renderIcon(ICON_PATHS["corner-up-right"], size);
@@ -849,6 +865,7 @@ var TRANSCRIPT_BATCH_SIZE = 50;
 var SESSION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 var FONT_SCALE_MULTIPLIERS = { 1: 0.85, 2: 0.93, 3: 1, 4: 1.1, 5: 1.25 };
 var MINIMAP_TAP_SLOP = 8;
+var MINIMAP_RAIL_INSET = 12;
 var PAGE_SIZES = [20, 50, 100];
 var AGENT_AGNOSTIC = /* @__PURE__ */ new Set(["list-dirs", "check-dir", "classify-export-destination", "agents"]);
 var DEFAULT_AGENT = "claude-code";
@@ -958,6 +975,26 @@ function nextMinimapPreviewLines(lines, measuredHeight, availableHeight) {
 }
 function isMinimapPointerTap(start, end) {
   return Boolean(start && start.pointerId === end.pointerId && !start.exceededTapSlop && Math.hypot(end.clientX - start.startX, end.clientY - start.startY) < MINIMAP_TAP_SLOP);
+}
+function minimapTickPosition(tickIndex, tickCount, railHeight, tickHeight, inset = MINIMAP_RAIL_INSET) {
+  const height = Math.max(0, railHeight);
+  const markerHeight = Math.max(0, Math.min(tickHeight, height));
+  const edgeInset = Math.min(Math.max(0, inset), Math.max(0, (height - markerHeight) / 2));
+  const firstCenter = edgeInset + markerHeight / 2;
+  const trackHeight = Math.max(0, height - edgeInset * 2 - markerHeight);
+  const denominator = Math.max(1, Math.floor(tickCount) - 1);
+  const index = Math.min(denominator, Math.max(0, Math.floor(tickIndex)));
+  return firstCenter + index / denominator * trackHeight;
+}
+function nearestMinimapTickIndex(clientY, railTop, railHeight, tickCount, tickHeight, inset = MINIMAP_RAIL_INSET) {
+  const count = Math.max(0, Math.floor(tickCount));
+  if (!count || railHeight <= 0) return -1;
+  if (count === 1) return 0;
+  const firstCenter = railTop + minimapTickPosition(0, count, railHeight, tickHeight, inset);
+  const lastCenter = railTop + minimapTickPosition(count - 1, count, railHeight, tickHeight, inset);
+  if (lastCenter <= firstCenter) return 0;
+  const ratio = Math.min(1, Math.max(0, (clientY - firstCenter) / (lastCenter - firstCenter)));
+  return Math.round(ratio * (count - 1));
 }
 function sampleMinimapTurnIndices(total, capacity) {
   const count = Math.max(0, Math.floor(total));
@@ -2525,7 +2562,12 @@ function activate(ctx) {
     const railRect = rail.getBoundingClientRect();
     const denominator = Math.max(1, minimapTicks.value.length - 1);
     const tickHeight = minimapPitch.value === 2 ? 1 : 2;
-    const tickY = railRect.top + tickHeight / 2 + tickIndex / denominator * Math.max(0, railRect.height - tickHeight);
+    const tickY = railRect.top + minimapTickPosition(
+      tickIndex,
+      denominator + 1,
+      railRect.height,
+      tickHeight
+    );
     const cardHeight = card.getBoundingClientRect().height;
     const availableHeight = Math.max(0, bounds.bottom - bounds.top);
     const fittedLines = nextMinimapPreviewLines(minimapPreviewLines.value, cardHeight, availableHeight);
@@ -2576,8 +2618,14 @@ function activate(ctx) {
     if (!rail || !minimapTicks.value.length) return -1;
     const rect = rail.getBoundingClientRect();
     if (!rect.height) return -1;
-    const ratio = Math.min(1, Math.max(0, (clientY - rect.top) / rect.height));
-    return Math.round(ratio * (minimapTicks.value.length - 1));
+    const tickHeight = minimapPitch.value === 2 ? 1 : 2;
+    return nearestMinimapTickIndex(
+      clientY,
+      rect.top,
+      rect.height,
+      minimapTicks.value.length,
+      tickHeight
+    );
   }
   function isKbExcludedPointer(event) {
     if (typeof document === "undefined") return false;
@@ -2720,8 +2768,9 @@ function activate(ctx) {
       const article = body.querySelector(`[data-transcript-index="${turn.messageIndex}"]`);
       return article ? article.getBoundingClientRect().top - bodyRect.top + body.scrollTop : 0;
     });
-    minimapPitch.value = minimapTurns.length * 5 <= railHeight ? 5 : minimapTurns.length * 3 <= railHeight ? 3 : 2;
-    const capacity = Math.max(2, Math.floor(railHeight / 2));
+    const tickTrackHeight = Math.max(0, railHeight - MINIMAP_RAIL_INSET * 2);
+    minimapPitch.value = minimapTurns.length * 5 <= tickTrackHeight ? 5 : minimapTurns.length * 3 <= tickTrackHeight ? 3 : 2;
+    const capacity = Math.max(2, Math.floor(tickTrackHeight / 2));
     minimapSampledTurns = sampleMinimapTurnIndices(minimapTurns.length, capacity);
     const sampled = minimapSampledTurns.length < minimapTurns.length;
     minimapTicks.value = minimapSampledTurns.map((turnIndex) => ({ ...minimapTurns[turnIndex], sampled }));
@@ -4901,7 +4950,7 @@ function activate(ctx) {
       "aria-selected": tickIndex === focused,
       "aria-label": t("minimap-tick", { n: tick2.turnIndex + 1 }),
       style: {
-        top: `${tickHeight / 2 + tickIndex / last * Math.max(0, minimapRailHeight.value - tickHeight)}px`
+        top: `${minimapTickPosition(tickIndex, last + 1, minimapRailHeight.value, tickHeight)}px`
       }
     }, [])));
     const tick = minimapTicks.value[minimapPreviewTick.value];
@@ -4976,7 +5025,7 @@ function activate(ctx) {
       "aria-label": label,
       onClick: activateJumpPill,
       onTouchend: (event) => event.stopPropagation()
-    }, [jumpPillAtBottom.value ? IconArrowUp(15) : IconArrowDown(15)]);
+    }, [jumpPillAtBottom.value ? IconArrowUpToLine(15) : IconArrowDownToLine(15)]);
   }
   function renderMarkdown(content) {
     if (!content) return [h("span", { class: "ccm-browser-muted" }, t("no-content"))];
@@ -5288,6 +5337,7 @@ function activate(ctx) {
 }
 export {
   DEFAULT_PARTITION_SORT,
+  MINIMAP_RAIL_INSET,
   PAGE_SIZES,
   TRANSCRIPT_BATCH_SIZE,
   activate,
@@ -5306,6 +5356,8 @@ export {
   isSafeTranscriptHref,
   localDateBounds,
   mapMinimapTurnToTick,
+  minimapTickPosition,
+  nearestMinimapTickIndex,
   nextJumpPillAtBottom,
   nextMinimapPreviewLines,
   nextTranscriptBatchEnd,

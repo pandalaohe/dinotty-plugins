@@ -4,8 +4,10 @@ import {
   IconArchive,
   IconArchiveRestore,
   IconArrowDown,
+  IconArrowDownToLine,
   IconArrowLeft,
   IconArrowUp,
+  IconArrowUpToLine,
   IconCheck,
   IconChevronDown,
   IconChevronLeft,
@@ -324,6 +326,7 @@ export const TRANSCRIPT_BATCH_SIZE = 50
 const SESSION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const FONT_SCALE_MULTIPLIERS: Record<number, number> = { 1: 0.85, 2: 0.93, 3: 1, 4: 1.1, 5: 1.25 }
 const MINIMAP_TAP_SLOP = 8
+export const MINIMAP_RAIL_INSET = 12
 export const PAGE_SIZES = [20, 50, 100] as const
 const AGENT_AGNOSTIC = new Set(['list-dirs', 'check-dir', 'classify-export-destination', 'agents'])
 const DEFAULT_AGENT: AgentId = 'claude-code'
@@ -467,6 +470,41 @@ export function isMinimapPointerTap(
     && start.pointerId === end.pointerId
     && !start.exceededTapSlop
     && Math.hypot(end.clientX - start.startX, end.clientY - start.startY) < MINIMAP_TAP_SLOP)
+}
+
+export function minimapTickPosition(
+  tickIndex: number,
+  tickCount: number,
+  railHeight: number,
+  tickHeight: number,
+  inset = MINIMAP_RAIL_INSET,
+): number {
+  const height = Math.max(0, railHeight)
+  const markerHeight = Math.max(0, Math.min(tickHeight, height))
+  const edgeInset = Math.min(Math.max(0, inset), Math.max(0, (height - markerHeight) / 2))
+  const firstCenter = edgeInset + markerHeight / 2
+  const trackHeight = Math.max(0, height - edgeInset * 2 - markerHeight)
+  const denominator = Math.max(1, Math.floor(tickCount) - 1)
+  const index = Math.min(denominator, Math.max(0, Math.floor(tickIndex)))
+  return firstCenter + index / denominator * trackHeight
+}
+
+export function nearestMinimapTickIndex(
+  clientY: number,
+  railTop: number,
+  railHeight: number,
+  tickCount: number,
+  tickHeight: number,
+  inset = MINIMAP_RAIL_INSET,
+): number {
+  const count = Math.max(0, Math.floor(tickCount))
+  if (!count || railHeight <= 0) return -1
+  if (count === 1) return 0
+  const firstCenter = railTop + minimapTickPosition(0, count, railHeight, tickHeight, inset)
+  const lastCenter = railTop + minimapTickPosition(count - 1, count, railHeight, tickHeight, inset)
+  if (lastCenter <= firstCenter) return 0
+  const ratio = Math.min(1, Math.max(0, (clientY - firstCenter) / (lastCenter - firstCenter)))
+  return Math.round(ratio * (count - 1))
 }
 
 export function sampleMinimapTurnIndices(total: number, capacity: number): number[] {
@@ -2272,8 +2310,12 @@ export function activate(ctx: PluginContext): PluginExports {
     const railRect = rail.getBoundingClientRect()
     const denominator = Math.max(1, minimapTicks.value.length - 1)
     const tickHeight = minimapPitch.value === 2 ? 1 : 2
-    const tickY = railRect.top + tickHeight / 2
-      + tickIndex / denominator * Math.max(0, railRect.height - tickHeight)
+    const tickY = railRect.top + minimapTickPosition(
+      tickIndex,
+      denominator + 1,
+      railRect.height,
+      tickHeight,
+    )
     const cardHeight = card.getBoundingClientRect().height
     const availableHeight = Math.max(0, bounds.bottom - bounds.top)
     const fittedLines = nextMinimapPreviewLines(minimapPreviewLines.value, cardHeight, availableHeight)
@@ -2328,8 +2370,14 @@ export function activate(ctx: PluginContext): PluginExports {
     if (!rail || !minimapTicks.value.length) return -1
     const rect = rail.getBoundingClientRect()
     if (!rect.height) return -1
-    const ratio = Math.min(1, Math.max(0, (clientY - rect.top) / rect.height))
-    return Math.round(ratio * (minimapTicks.value.length - 1))
+    const tickHeight = minimapPitch.value === 2 ? 1 : 2
+    return nearestMinimapTickIndex(
+      clientY,
+      rect.top,
+      rect.height,
+      minimapTicks.value.length,
+      tickHeight,
+    )
   }
 
   function isKbExcludedPointer(event: PointerEvent): boolean {
@@ -2485,8 +2533,9 @@ export function activate(ctx: PluginContext): PluginExports {
       const article = body.querySelector<HTMLElement>(`[data-transcript-index="${turn.messageIndex}"]`)
       return article ? article.getBoundingClientRect().top - bodyRect.top + body.scrollTop : 0
     })
-    minimapPitch.value = minimapTurns.length * 5 <= railHeight ? 5 : minimapTurns.length * 3 <= railHeight ? 3 : 2
-    const capacity = Math.max(2, Math.floor(railHeight / 2))
+    const tickTrackHeight = Math.max(0, railHeight - MINIMAP_RAIL_INSET * 2)
+    minimapPitch.value = minimapTurns.length * 5 <= tickTrackHeight ? 5 : minimapTurns.length * 3 <= tickTrackHeight ? 3 : 2
+    const capacity = Math.max(2, Math.floor(tickTrackHeight / 2))
     minimapSampledTurns = sampleMinimapTurnIndices(minimapTurns.length, capacity)
     const sampled = minimapSampledTurns.length < minimapTurns.length
     minimapTicks.value = minimapSampledTurns.map(turnIndex => ({ ...minimapTurns[turnIndex], sampled }))
@@ -4817,7 +4866,7 @@ export function activate(ctx: PluginContext): PluginExports {
       'aria-selected': tickIndex === focused,
       'aria-label': t('minimap-tick', { n: tick.turnIndex + 1 }),
       style: {
-        top: `${tickHeight / 2 + tickIndex / last * Math.max(0, minimapRailHeight.value - tickHeight)}px`,
+        top: `${minimapTickPosition(tickIndex, last + 1, minimapRailHeight.value, tickHeight)}px`,
       },
     }, [])))
 
@@ -4894,7 +4943,7 @@ export function activate(ctx: PluginContext): PluginExports {
       'aria-label': label,
       onClick: activateJumpPill,
       onTouchend: (event: TouchEvent) => event.stopPropagation(),
-    }, [jumpPillAtBottom.value ? IconArrowUp(15) : IconArrowDown(15)])
+    }, [jumpPillAtBottom.value ? IconArrowUpToLine(15) : IconArrowDownToLine(15)])
   }
 
   function renderMarkdown(content: string): any[] {

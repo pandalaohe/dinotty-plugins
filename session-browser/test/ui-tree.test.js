@@ -36,6 +36,8 @@ const {
   isMinimapPointerTap,
   isMinimapTouchTickOpen,
   mapMinimapTurnToTick,
+  minimapTickPosition,
+  nearestMinimapTickIndex,
   nextMinimapPreviewLines,
   nextJumpPillAtBottom,
   nextTranscriptBatchEnd,
@@ -78,6 +80,17 @@ test('minimap sampling preserves first and last turns and active mapping uses ca
   assert.equal(mapMinimapTurnToTick(sampled, 0), 0)
   assert.equal(mapMinimapTurnToTick(sampled, 5), 1)
   assert.equal(mapMinimapTurnToTick(sampled, 9), 3)
+})
+
+test('minimap tick positions and nearest-tick mapping share the 12px rail inset', () => {
+  assert.equal(minimapTickPosition(0, 5, 100, 2), 13)
+  assert.equal(minimapTickPosition(4, 5, 100, 2), 87)
+  assert.equal(minimapTickPosition(2, 5, 100, 2), 50)
+  assert.equal(nearestMinimapTickIndex(100, 100, 100, 5, 2), 0)
+  assert.equal(nearestMinimapTickIndex(112, 100, 100, 5, 2), 0)
+  assert.equal(nearestMinimapTickIndex(140, 100, 100, 5, 2), 1)
+  assert.equal(nearestMinimapTickIndex(188, 100, 100, 5, 2), 4)
+  assert.equal(nearestMinimapTickIndex(200, 100, 100, 5, 2), 4)
 })
 
 test('focus-only minimap selection still counts as an open touch tick', () => {
