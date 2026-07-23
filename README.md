@@ -13,6 +13,7 @@ Plugin collection for [dinotty](https://github.com/xichan96/dinotty) -- a set of
 | [Skill Manager](./skill-manager) | 1.0.0 | Manage Claude Code Agent Skills (~/.claude/skills/) | 管理 Claude Code Agent Skills (~/.claude/skills/) |
 | [Text Diff](./text-diff) | 1.0.0 | Text diff comparison tool with line-by-line highlighting | 文本差异对比工具，支持逐行对比与高亮显示 |
 | [Claude Code](./claude-code) | 1.0.0 | Visual conversation manager for Claude Code | Claude Code 可视化对话管理 — 浏览历史、新建和恢复会话 |
+| [Volcano Ark Quota](./volc-ark-quota) | 0.1.0 | Display Volcano Engine Ark Flow Plan quota (5h / daily / weekly / monthly) in the status bar | 在状态栏展示火山引擎 Ark Flow Plan 配额（5小时 / 日 / 周 / 月） |
 
 ## Installation
 
@@ -34,6 +35,7 @@ Some plugins have additional dependencies:
 | Skill Manager | `git`, `curl` |
 | Text Diff | None |
 | Claude Code | `claude` CLI (in PATH), 需先安装 [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) |
+| Volcano Ark Quota | `curl` (for API calls) |
 
 ## Plugin Architecture
 
@@ -116,6 +118,7 @@ dinotty-plugins/
   skill-manager/             # Claude Code skill manager (TypeScript)
   text-diff/                 # Text diff tool (JavaScript)
   claude-code/               # Claude Code conversation manager (TypeScript)
+  volc-ark-quota/            # Volcano Engine Ark Flow Plan quota (JavaScript)
 ```
 
 ## Development

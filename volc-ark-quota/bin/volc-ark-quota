@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# volc-ark-quota CLI wrapper.
+# The dinotty plugin exec API requires the plugin to declare a `bin` -- it runs
+# that bin and passes args through. We just forward to curl, since the plugin's
+# signing logic lives in JS (Web Crypto) and only the HTTP call needs a shell.
+set -euo pipefail
+exec curl "$@"
