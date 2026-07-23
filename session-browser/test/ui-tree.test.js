@@ -33,7 +33,10 @@ const {
   filterSessions,
   isSafeTranscriptHref,
   findMinimapActiveTurn,
+  isMinimapPointerTap,
+  isMinimapTouchTickOpen,
   mapMinimapTurnToTick,
+  nextMinimapPreviewLines,
   nextJumpPillAtBottom,
   nextTranscriptBatchEnd,
   normalizeStoredExpandedPaths,
@@ -75,6 +78,29 @@ test('minimap sampling preserves first and last turns and active mapping uses ca
   assert.equal(mapMinimapTurnToTick(sampled, 0), 0)
   assert.equal(mapMinimapTurnToTick(sampled, 5), 1)
   assert.equal(mapMinimapTurnToTick(sampled, 9), 3)
+})
+
+test('focus-only minimap selection still counts as an open touch tick', () => {
+  assert.equal(isMinimapTouchTickOpen(2, 2, -1, 0, 'touch'), true)
+  assert.equal(isMinimapTouchTickOpen(2, 1, -1, 0, 'touch'), false)
+  assert.equal(isMinimapTouchTickOpen(2, 2, -1, 0, 'keyboard'), false)
+  assert.equal(isMinimapTouchTickOpen(2, 1, 2, 3, 'touch'), true)
+})
+
+test('minimap preview retries measured tiers from three lines to one line to focus-only', () => {
+  assert.equal(nextMinimapPreviewLines(3, 90, 89), 1)
+  assert.equal(nextMinimapPreviewLines(1, 54, 53), 0)
+  assert.equal(nextMinimapPreviewLines(3, 90, 90), 3)
+  assert.equal(nextMinimapPreviewLines(1, 54, 54), 1)
+})
+
+test('minimap card tap requires the initiating pointer within strict 8px slop', () => {
+  const start = { pointerId: 7, startX: 10, startY: 20 }
+  assert.equal(isMinimapPointerTap(start, { pointerId: 7, clientX: 13, clientY: 24 }), true)
+  assert.equal(isMinimapPointerTap(start, { pointerId: 8, clientX: 13, clientY: 24 }), false)
+  assert.equal(isMinimapPointerTap(start, { pointerId: 7, clientX: 18, clientY: 20 }), false)
+  assert.equal(isMinimapPointerTap({ ...start, exceededTapSlop: true }, { pointerId: 7, clientX: 10, clientY: 20 }), false)
+  assert.equal(isMinimapPointerTap(null, { pointerId: 7, clientX: 10, clientY: 20 }), false)
 })
 
 test('jump pill state uses 24px entry and max(200px, half-screen) exit hysteresis', () => {

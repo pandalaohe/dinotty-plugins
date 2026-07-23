@@ -849,8 +849,6 @@ var TRANSCRIPT_BATCH_SIZE = 50;
 var SESSION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 var FONT_SCALE_MULTIPLIERS = { 1: 0.85, 2: 0.93, 3: 1, 4: 1.1, 5: 1.25 };
 var MINIMAP_TAP_SLOP = 8;
-var MINIMAP_PREVIEW_FULL_MIN_HEIGHT = 82;
-var MINIMAP_PREVIEW_ONE_LINE_MIN_HEIGHT = 46;
 var PAGE_SIZES = [20, 50, 100];
 var AGENT_AGNOSTIC = /* @__PURE__ */ new Set(["list-dirs", "check-dir", "classify-export-destination", "agents"]);
 var DEFAULT_AGENT = "claude-code";
@@ -949,6 +947,17 @@ function resolveSessionTitle(session) {
 function nextTranscriptBatchEnd(total, rendered, batchSize = TRANSCRIPT_BATCH_SIZE) {
   if (!Number.isFinite(total) || !Number.isFinite(rendered) || !Number.isFinite(batchSize) || batchSize <= 0) return 0;
   return Math.min(Math.max(0, Math.floor(total)), Math.max(0, Math.floor(rendered)) + Math.floor(batchSize));
+}
+function isMinimapTouchTickOpen(tickIndex, focusedTick, previewTick, previewLines, previewMode) {
+  if (previewMode !== "touch") return false;
+  return previewTick === tickIndex || previewLines === 0 && focusedTick === tickIndex;
+}
+function nextMinimapPreviewLines(lines, measuredHeight, availableHeight) {
+  if (measuredHeight <= availableHeight) return lines;
+  return lines === 3 ? 1 : 0;
+}
+function isMinimapPointerTap(start, end) {
+  return Boolean(start && start.pointerId === end.pointerId && !start.exceededTapSlop && Math.hypot(end.clientX - start.startX, end.clientY - start.startY) < MINIMAP_TAP_SLOP);
 }
 function sampleMinimapTurnIndices(total, capacity) {
   const count = Math.max(0, Math.floor(total));
@@ -1630,6 +1639,7 @@ function activate(ctx) {
   let minimapAnchors = [];
   let minimapSampledTurns = [];
   let minimapPointerState = null;
+  let minimapCardPointerState = null;
   let outsidePreviewPointerDown = null;
   const searchInputRef = ctx.ref(null);
   const page = ctx.ref(1);
@@ -1933,6 +1943,7 @@ function activate(ctx) {
       transcriptScrollFrame: null,
       minimapRebuildFrame: null,
       localeObserver: null,
+      mobileKbObserverTarget: void 0,
       pinsNoteTimer: null
     };
   }
@@ -2061,6 +2072,32 @@ function activate(ctx) {
     if (kbBtn) mount.rootResizeObserver.observe(kbBtn);
     const mobileKb = document.getElementById("mobile-kb");
     if (mobileKb) mount.rootResizeObserver.observe(mobileKb);
+  }
+  function attachHostMutationObserver(mount) {
+    const observer = mount.localeObserver;
+    if (!observer || typeof document === "undefined") return;
+    const mobileKb = document.getElementById("mobile-kb");
+    if (mount.mobileKbObserverTarget === mobileKb) return;
+    if (mount.mobileKbObserverTarget !== void 0) observer.disconnect();
+    mount.mobileKbObserverTarget = mobileKb;
+    if (!mobileKb) {
+      observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ["lang"]
+      });
+      return;
+    }
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["lang"]
+    });
+    observer.observe(mobileKb, {
+      attributes: true,
+      attributeFilter: ["style", "hidden"]
+    });
+    mount.rootResizeObserver?.observe(mobileKb);
   }
   function setRootElement(element) {
     if (element === rootRef.value) return;
@@ -2438,6 +2475,18 @@ function activate(ctx) {
     minimapPreviewRef.value = null;
     minimapFocusedTick.value = -1;
     minimapPointerState = null;
+    minimapCardPointerState = null;
+    removeOutsidePreviewHandler();
+  }
+  function degradeMinimapPreview(lines) {
+    minimapPreviewLines.value = lines;
+    if (lines) {
+      schedulePreviewPosition();
+      return;
+    }
+    minimapPreviewTick.value = -1;
+    minimapPreviewRef.value = null;
+    minimapCardPointerState = null;
     removeOutsidePreviewHandler();
   }
   function previewBounds(mode) {
@@ -2478,9 +2527,15 @@ function activate(ctx) {
     const tickHeight = minimapPitch.value === 2 ? 1 : 2;
     const tickY = railRect.top + tickHeight / 2 + tickIndex / denominator * Math.max(0, railRect.height - tickHeight);
     const cardHeight = card.getBoundingClientRect().height;
+    const availableHeight = Math.max(0, bounds.bottom - bounds.top);
+    const fittedLines = nextMinimapPreviewLines(minimapPreviewLines.value, cardHeight, availableHeight);
+    if (fittedLines !== minimapPreviewLines.value) {
+      degradeMinimapPreview(fittedLines);
+      return;
+    }
     const top = Math.min(bounds.bottom - cardHeight, Math.max(bounds.top, tickY - cardHeight / 2));
     if (top < bounds.top || top + cardHeight > bounds.bottom) {
-      closeMinimapPreview();
+      degradeMinimapPreview(minimapPreviewLines.value === 3 ? 1 : 0);
       return;
     }
     minimapPreviewTop.value = top - bounds.paneRect.top;
@@ -2505,8 +2560,7 @@ function activate(ctx) {
     minimapFocusedTick.value = tickIndex;
     const bounds = previewBounds(mode);
     if (!bounds) return;
-    const available = Math.max(0, bounds.bottom - bounds.top);
-    const lines = available >= MINIMAP_PREVIEW_FULL_MIN_HEIGHT ? 3 : available >= MINIMAP_PREVIEW_ONE_LINE_MIN_HEIGHT ? 1 : 0;
+    const lines = bounds.bottom > bounds.top ? 3 : 0;
     minimapPreviewMode.value = mode;
     minimapPreviewLines.value = lines;
     minimapPreviewTick.value = lines ? tickIndex : -1;
@@ -2548,7 +2602,13 @@ function activate(ctx) {
         startX: event.clientX,
         startY: event.clientY,
         startTick: tickIndex,
-        openedSameTick: minimapPreviewTick.value === tickIndex && minimapPreviewMode.value === "touch",
+        openedSameTick: isMinimapTouchTickOpen(
+          tickIndex,
+          minimapFocusedTick.value,
+          minimapPreviewTick.value,
+          minimapPreviewLines.value,
+          minimapPreviewMode.value
+        ),
         changedTick: false,
         exceededTapSlop: false
       };
@@ -4862,12 +4922,38 @@ function activate(ctx) {
       "aria-label": t("minimap-preview-jump"),
       style: { top: `${minimapPreviewTop.value}px` },
       onPointerdown: (event) => {
-        if (event.pointerType === "touch" || event.pointerType === "pen") event.preventDefault();
+        if (event.pointerType !== "touch" && event.pointerType !== "pen") {
+          minimapCardPointerState = null;
+          return;
+        }
+        event.preventDefault();
+        minimapCardPointerState = {
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY,
+          exceededTapSlop: false
+        };
+        minimapPreviewRef.value?.setPointerCapture?.(event.pointerId);
+      },
+      onPointermove: (event) => {
+        const state = minimapCardPointerState;
+        if (!state || state.pointerId !== event.pointerId) return;
+        if (Math.hypot(event.clientX - state.startX, event.clientY - state.startY) >= MINIMAP_TAP_SLOP) {
+          state.exceededTapSlop = true;
+        }
       },
       onPointerup: (event) => {
         if (event.pointerType !== "touch" && event.pointerType !== "pen") return;
+        const state = minimapCardPointerState;
+        if (!state || state.pointerId !== event.pointerId) return;
+        minimapPreviewRef.value?.releasePointerCapture?.(event.pointerId);
+        minimapCardPointerState = null;
+        if (!isMinimapPointerTap(state, event)) return;
         jumpToMinimapTick(tick);
         closeMinimapPreview();
+      },
+      onPointercancel: (event) => {
+        if (minimapCardPointerState?.pointerId === event.pointerId) minimapCardPointerState = null;
       },
       onTouchend: (event) => event.stopPropagation()
     }, [
@@ -5090,14 +5176,11 @@ function activate(ctx) {
               if (isActiveMount(mount) && localeSetting.value === "auto") {
                 localeRef.value = resolveLocale("auto", document.documentElement.lang);
               }
-              if (isActiveMount(mount)) updateKbAvoid();
+              if (!isActiveMount(mount)) return;
+              attachHostMutationObserver(mount);
+              updateKbAvoid();
             });
-            mount.localeObserver.observe(document.documentElement, {
-              childList: true,
-              subtree: true,
-              attributes: true,
-              attributeFilter: ["lang", "class", "style", "hidden"]
-            });
+            attachHostMutationObserver(mount);
           }
           if (rootRef.value) observeRootElement(mount, rootRef.value);
           const preserveState = hasMounted;
@@ -5218,10 +5301,13 @@ export {
   filterBranchOptions,
   filterSessions,
   findMinimapActiveTurn,
+  isMinimapPointerTap,
+  isMinimapTouchTickOpen,
   isSafeTranscriptHref,
   localDateBounds,
   mapMinimapTurnToTick,
   nextJumpPillAtBottom,
+  nextMinimapPreviewLines,
   nextTranscriptBatchEnd,
   normalizeDateRange,
   normalizePartitionSortSettings,

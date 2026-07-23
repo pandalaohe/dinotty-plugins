@@ -100,6 +100,13 @@ interface MinimapPointerState {
   exceededTapSlop: boolean
 }
 
+interface MinimapCardPointerState {
+  pointerId: number
+  startX: number
+  startY: number
+  exceededTapSlop: boolean
+}
+
 export interface SessionPathTreeNode {
   path: string
   name: string
@@ -286,6 +293,7 @@ interface MountContext {
   transcriptScrollFrame: number | null
   minimapRebuildFrame: number | null
   localeObserver: MutationObserver | null
+  mobileKbObserverTarget: HTMLElement | null | undefined
   pinsNoteTimer: ReturnType<typeof setTimeout> | null
 }
 
@@ -316,8 +324,6 @@ export const TRANSCRIPT_BATCH_SIZE = 50
 const SESSION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const FONT_SCALE_MULTIPLIERS: Record<number, number> = { 1: 0.85, 2: 0.93, 3: 1, 4: 1.1, 5: 1.25 }
 const MINIMAP_TAP_SLOP = 8
-const MINIMAP_PREVIEW_FULL_MIN_HEIGHT = 82
-const MINIMAP_PREVIEW_ONE_LINE_MIN_HEIGHT = 46
 export const PAGE_SIZES = [20, 50, 100] as const
 const AGENT_AGNOSTIC = new Set(['list-dirs', 'check-dir', 'classify-export-destination', 'agents'])
 const DEFAULT_AGENT: AgentId = 'claude-code'
@@ -431,6 +437,36 @@ export function resolveSessionTitle(session: Pick<IndexedSession, 'title' | 'aiT
 export function nextTranscriptBatchEnd(total: number, rendered: number, batchSize = TRANSCRIPT_BATCH_SIZE): number {
   if (!Number.isFinite(total) || !Number.isFinite(rendered) || !Number.isFinite(batchSize) || batchSize <= 0) return 0
   return Math.min(Math.max(0, Math.floor(total)), Math.max(0, Math.floor(rendered)) + Math.floor(batchSize))
+}
+
+export function isMinimapTouchTickOpen(
+  tickIndex: number,
+  focusedTick: number,
+  previewTick: number,
+  previewLines: 0 | 1 | 3,
+  previewMode: MinimapPreviewMode,
+): boolean {
+  if (previewMode !== 'touch') return false
+  return previewTick === tickIndex || (previewLines === 0 && focusedTick === tickIndex)
+}
+
+export function nextMinimapPreviewLines(
+  lines: 0 | 1 | 3,
+  measuredHeight: number,
+  availableHeight: number,
+): 0 | 1 | 3 {
+  if (measuredHeight <= availableHeight) return lines
+  return lines === 3 ? 1 : 0
+}
+
+export function isMinimapPointerTap(
+  start: { pointerId: number; startX: number; startY: number; exceededTapSlop?: boolean } | null,
+  end: { pointerId: number; clientX: number; clientY: number },
+): boolean {
+  return Boolean(start
+    && start.pointerId === end.pointerId
+    && !start.exceededTapSlop
+    && Math.hypot(end.clientX - start.startX, end.clientY - start.startY) < MINIMAP_TAP_SLOP)
 }
 
 export function sampleMinimapTurnIndices(total: number, capacity: number): number[] {
@@ -1236,6 +1272,7 @@ export function activate(ctx: PluginContext): PluginExports {
   let minimapAnchors: number[] = []
   let minimapSampledTurns: number[] = []
   let minimapPointerState: MinimapPointerState | null = null
+  let minimapCardPointerState: MinimapCardPointerState | null = null
   let outsidePreviewPointerDown: ((event: PointerEvent) => void) | null = null
   const searchInputRef = ctx.ref<HTMLInputElement | null>(null)
   const page = ctx.ref(1)
@@ -1578,6 +1615,7 @@ export function activate(ctx: PluginContext): PluginExports {
       transcriptScrollFrame: null,
       minimapRebuildFrame: null,
       localeObserver: null,
+      mobileKbObserverTarget: undefined,
       pinsNoteTimer: null,
     }
   }
@@ -1718,6 +1756,33 @@ export function activate(ctx: PluginContext): PluginExports {
     if (kbBtn) mount.rootResizeObserver.observe(kbBtn)
     const mobileKb = document.getElementById('mobile-kb')
     if (mobileKb) mount.rootResizeObserver.observe(mobileKb)
+  }
+
+  function attachHostMutationObserver(mount: MountContext) {
+    const observer = mount.localeObserver
+    if (!observer || typeof document === 'undefined') return
+    const mobileKb = document.getElementById('mobile-kb')
+    if (mount.mobileKbObserverTarget === mobileKb) return
+    if (mount.mobileKbObserverTarget !== undefined) observer.disconnect()
+    mount.mobileKbObserverTarget = mobileKb
+    if (!mobileKb) {
+      observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['lang'],
+      })
+      return
+    }
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['lang'],
+    })
+    observer.observe(mobileKb, {
+      attributes: true,
+      attributeFilter: ['style', 'hidden'],
+    })
+    mount.rootResizeObserver?.observe(mobileKb)
   }
 
   function setRootElement(element: HTMLElement | null) {
@@ -2154,6 +2219,19 @@ export function activate(ctx: PluginContext): PluginExports {
     minimapPreviewRef.value = null
     minimapFocusedTick.value = -1
     minimapPointerState = null
+    minimapCardPointerState = null
+    removeOutsidePreviewHandler()
+  }
+
+  function degradeMinimapPreview(lines: 0 | 1 | 3) {
+    minimapPreviewLines.value = lines
+    if (lines) {
+      schedulePreviewPosition()
+      return
+    }
+    minimapPreviewTick.value = -1
+    minimapPreviewRef.value = null
+    minimapCardPointerState = null
     removeOutsidePreviewHandler()
   }
 
@@ -2197,9 +2275,15 @@ export function activate(ctx: PluginContext): PluginExports {
     const tickY = railRect.top + tickHeight / 2
       + tickIndex / denominator * Math.max(0, railRect.height - tickHeight)
     const cardHeight = card.getBoundingClientRect().height
+    const availableHeight = Math.max(0, bounds.bottom - bounds.top)
+    const fittedLines = nextMinimapPreviewLines(minimapPreviewLines.value, cardHeight, availableHeight)
+    if (fittedLines !== minimapPreviewLines.value) {
+      degradeMinimapPreview(fittedLines)
+      return
+    }
     const top = Math.min(bounds.bottom - cardHeight, Math.max(bounds.top, tickY - cardHeight / 2))
     if (top < bounds.top || top + cardHeight > bounds.bottom) {
-      closeMinimapPreview()
+      degradeMinimapPreview(minimapPreviewLines.value === 3 ? 1 : 0)
       return
     }
     minimapPreviewTop.value = top - bounds.paneRect.top
@@ -2227,10 +2311,7 @@ export function activate(ctx: PluginContext): PluginExports {
     minimapFocusedTick.value = tickIndex
     const bounds = previewBounds(mode)
     if (!bounds) return
-    const available = Math.max(0, bounds.bottom - bounds.top)
-    const lines: 0 | 1 | 3 = available >= MINIMAP_PREVIEW_FULL_MIN_HEIGHT
-      ? 3
-      : available >= MINIMAP_PREVIEW_ONE_LINE_MIN_HEIGHT ? 1 : 0
+    const lines: 0 | 3 = bounds.bottom > bounds.top ? 3 : 0
     minimapPreviewMode.value = mode
     minimapPreviewLines.value = lines
     minimapPreviewTick.value = lines ? tickIndex : -1
@@ -2277,7 +2358,13 @@ export function activate(ctx: PluginContext): PluginExports {
         startX: event.clientX,
         startY: event.clientY,
         startTick: tickIndex,
-        openedSameTick: minimapPreviewTick.value === tickIndex && minimapPreviewMode.value === 'touch',
+        openedSameTick: isMinimapTouchTickOpen(
+          tickIndex,
+          minimapFocusedTick.value,
+          minimapPreviewTick.value,
+          minimapPreviewLines.value,
+          minimapPreviewMode.value,
+        ),
         changedTick: false,
         exceededTapSlop: false,
       }
@@ -4752,12 +4839,38 @@ export function activate(ctx: PluginContext): PluginExports {
       'aria-label': t('minimap-preview-jump'),
       style: { top: `${minimapPreviewTop.value}px` },
       onPointerdown: (event: PointerEvent) => {
-        if (event.pointerType === 'touch' || event.pointerType === 'pen') event.preventDefault()
+        if (event.pointerType !== 'touch' && event.pointerType !== 'pen') {
+          minimapCardPointerState = null
+          return
+        }
+        event.preventDefault()
+        minimapCardPointerState = {
+          pointerId: event.pointerId,
+          startX: event.clientX,
+          startY: event.clientY,
+          exceededTapSlop: false,
+        }
+        minimapPreviewRef.value?.setPointerCapture?.(event.pointerId)
+      },
+      onPointermove: (event: PointerEvent) => {
+        const state = minimapCardPointerState
+        if (!state || state.pointerId !== event.pointerId) return
+        if (Math.hypot(event.clientX - state.startX, event.clientY - state.startY) >= MINIMAP_TAP_SLOP) {
+          state.exceededTapSlop = true
+        }
       },
       onPointerup: (event: PointerEvent) => {
         if (event.pointerType !== 'touch' && event.pointerType !== 'pen') return
+        const state = minimapCardPointerState
+        if (!state || state.pointerId !== event.pointerId) return
+        minimapPreviewRef.value?.releasePointerCapture?.(event.pointerId)
+        minimapCardPointerState = null
+        if (!isMinimapPointerTap(state, event)) return
         jumpToMinimapTick(tick)
         closeMinimapPreview()
+      },
+      onPointercancel: (event: PointerEvent) => {
+        if (minimapCardPointerState?.pointerId === event.pointerId) minimapCardPointerState = null
       },
       onTouchend: (event: TouchEvent) => event.stopPropagation(),
     }, [
@@ -4975,14 +5088,11 @@ export function activate(ctx: PluginContext): PluginExports {
               if (isActiveMount(mount) && localeSetting.value === 'auto') {
                 localeRef.value = resolveLocale('auto', document.documentElement.lang)
               }
-              if (isActiveMount(mount)) updateKbAvoid()
+              if (!isActiveMount(mount)) return
+              attachHostMutationObserver(mount)
+              updateKbAvoid()
             })
-            mount.localeObserver.observe(document.documentElement, {
-              childList: true,
-              subtree: true,
-              attributes: true,
-              attributeFilter: ['lang', 'class', 'style', 'hidden'],
-            })
+            attachHostMutationObserver(mount)
           }
           if (rootRef.value) observeRootElement(mount, rootRef.value)
           const preserveState = hasMounted
