@@ -32,6 +32,9 @@ const {
   filterBranchOptions,
   filterSessions,
   isSafeTranscriptHref,
+  findMinimapActiveTurn,
+  mapMinimapTurnToTick,
+  nextJumpPillAtBottom,
   nextTranscriptBatchEnd,
   normalizeStoredExpandedPaths,
   normalizeStoredTreeRoot,
@@ -39,6 +42,7 @@ const {
   resolveSessionTitle,
   resolveSessionTitles,
   runBulkSerial,
+  sampleMinimapTurnIndices,
   shQuote,
   sortSessions,
 } = require(bundlePath)
@@ -58,6 +62,29 @@ test('transcript batches advance by 50 without exceeding the parsed message coun
   assert.equal(nextTranscriptBatchEnd(132, 50), 100)
   assert.equal(nextTranscriptBatchEnd(132, 100), 132)
   assert.equal(nextTranscriptBatchEnd(12, 0), 12)
+})
+
+test('minimap sampling preserves first and last turns and active mapping uses cached anchors', () => {
+  assert.deepEqual(sampleMinimapTurnIndices(5, 10), [0, 1, 2, 3, 4])
+  const sampled = sampleMinimapTurnIndices(10, 4)
+  assert.deepEqual(sampled, [0, 3, 6, 9])
+  assert.equal(findMinimapActiveTurn([100, 300, 700, 900], 0), 0)
+  assert.equal(findMinimapActiveTurn([100, 300, 700, 900], 699), 1)
+  assert.equal(findMinimapActiveTurn([100, 300, 700, 900], 700), 2)
+  assert.equal(findMinimapActiveTurn([100, 300, 700, 900], 500, true), 3)
+  assert.equal(mapMinimapTurnToTick(sampled, 0), 0)
+  assert.equal(mapMinimapTurnToTick(sampled, 5), 1)
+  assert.equal(mapMinimapTurnToTick(sampled, 9), 3)
+})
+
+test('jump pill state uses 24px entry and max(200px, half-screen) exit hysteresis', () => {
+  assert.equal(nextJumpPillAtBottom(false, 24, 800), true)
+  assert.equal(nextJumpPillAtBottom(true, 25, 800), true)
+  assert.equal(nextJumpPillAtBottom(true, 400, 800), true)
+  assert.equal(nextJumpPillAtBottom(true, 401, 800), false)
+  assert.equal(nextJumpPillAtBottom(true, 200, 200), true)
+  assert.equal(nextJumpPillAtBottom(true, 201, 200), false)
+  assert.equal(nextJumpPillAtBottom(false, 100, 800), false)
 })
 
 test('transcript markdown links only allow http, https, and mailto protocols', () => {
