@@ -1753,8 +1753,12 @@ export function activate(ctx: PluginContext): PluginExports {
 
   function settleCoordinatorTask() {
     // dispose() may already have released this instance's whole count; a late settle must not
-    // decrement a successor's tasks.
-    if (localOutstanding === 0) return
+    // decrement a successor's tasks. It still carries information: the operation landed after
+    // the handoff, so whatever the successor indexed may already be stale.
+    if (localOutstanding === 0) {
+      if (shared.retired) handoff.dirty = true
+      return
+    }
     localOutstanding--
     handoff.outstanding = Math.max(0, handoff.outstanding - 1)
     if (shared.retired) handoff.dirty = true
@@ -3312,6 +3316,11 @@ function createPaneRuntime(ctx: PluginContext, props: any, shared: SharedService
     const body = transcriptScrollRef.value
     const mount = activeMount
     if (!body || !isActiveMount(mount)) return
+    // Record the destination the moment the jump starts. The settle-time capture refines it,
+    // but a tab switch during the animation would otherwise restore the pre-jump anchor.
+    mount.stickToBottom = !jumpPillAtBottom.value
+    mount.scrollAnchorId = null
+    mount.scrollAnchorOffset = 0
     performProgrammaticTranscriptScroll(mount, body, () => {
       if (jumpPillAtBottom.value) body.scrollTo({ top: 0 })
       else body.scrollTo({ top: Math.max(0, body.scrollHeight - body.clientHeight), behavior: 'smooth' })

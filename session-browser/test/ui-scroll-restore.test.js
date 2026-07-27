@@ -668,6 +668,35 @@ test('a programmatic jump to the bottom survives a tab switch', async () => {
   }
 })
 
+test('a jump to the bottom interrupted by a tab switch still restores the bottom', async () => {
+  const middleAnchor = { id: 'message-1', contentTop: 400, height: 200 }
+  const harness = await createHarness()
+  const pane = harness.setupPane('pane-a')
+  const body = createScrollBody({
+    scrollHeight: 1000,
+    clientHeight: 300,
+    anchors: [middleAnchor],
+  })
+  try {
+    await harness.preparePane(pane, body)
+    captureUserScroll(harness, body, 450)
+
+    const jumpPill = pane.jumpPillNode()
+    assert.ok(jumpPill, 'jump-to-bottom control did not render')
+    jumpPill.props.onClick()
+    assert.equal(body.scrollTop, 700)
+
+    pane.setVisible(false)
+    body.scrollHeight = 1400
+    pane.setVisible(true)
+    harness.frames.flushAll()
+
+    assert.equal(body.scrollTop, 1100)
+  } finally {
+    harness.cleanup()
+  }
+})
+
 test('restore state does not leak from one transcript to the next', async () => {
   const sessionA = { ...indexedSession('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'), title: 'Transcript A' }
   const sessionB = { ...indexedSession('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'), title: 'Transcript B' }
