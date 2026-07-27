@@ -234,7 +234,12 @@ function transcriptMessages(count, emptyIds = false) {
   }))
 }
 
-async function createHarness({ messages = transcriptMessages(3), session = indexedSession() } = {}) {
+async function createHarness({
+  messages = transcriptMessages(3),
+  session = indexedSession(),
+  sessions = [session],
+  messagesBySession = {},
+} = {}) {
   const previous = {
     document: global.document,
     MutationObserver: global.MutationObserver,
@@ -315,9 +320,11 @@ async function createHarness({ messages = transcriptMessages(3), session = index
             stderr: '',
           }
         }
-        if (args[0] === 'build-index') return { code: 0, stdout: JSON.stringify([session]), stderr: '' }
+        if (args[0] === 'build-index') return { code: 0, stdout: JSON.stringify(sessions), stderr: '' }
         if (args[0] === 'list-pins') return { code: 0, stdout: JSON.stringify({ pins: [] }), stderr: '' }
-        if (args[0] === 'read-session') return { code: 0, stdout: JSON.stringify(messages), stderr: '' }
+        if (args[0] === 'read-session') {
+          return { code: 0, stdout: JSON.stringify(messagesBySession[args[2]] ?? messages), stderr: '' }
+        }
         return { code: 0, stdout: JSON.stringify({ outcome: 'success', cacheRefreshed: true }), stderr: '' }
       },
     },
@@ -362,11 +369,24 @@ async function createHarness({ messages = transcriptMessages(3), session = index
             && node.props.class.includes('ccm-browser-session-card'),
         )
       },
+      sessionCardFor(sessionId) {
+        return flatten(render()).find(
+          node => node?.tag === 'article'
+            && Array.isArray(node.props?.class)
+            && node.props.class.includes('ccm-browser-session-card')
+            && node.props?.key?.endsWith(`\0${sessionId}`),
+        )
+      },
       transcriptBodyNode() {
         return flatten(render()).find(
           node => node?.tag === 'div'
             && Array.isArray(node.props?.class)
             && node.props.class.includes('ccm-browser-transcript-body'),
+        )
+      },
+      jumpPillNode() {
+        return flatten(render()).find(
+          node => node?.tag === 'button' && node.props?.class === 'ccm-jump-pill',
         )
       },
     }
@@ -468,31 +488,40 @@ test('mid-list restore uses the composite transcript id and preserves the saved 
 })
 
 test('settled restore waits for transcript and minimap frames plus one additional frame', async () => {
-  const messages = transcriptMessages(120)
+  const messages = transcriptMessages(300)
   const anchor = { id: 'message-1', contentTop: 400, height: 220 }
   const harness = await createHarness({ messages })
   const pane = harness.setupPane('pane-a')
   const body = createScrollBody({ anchors: [anchor] })
   try {
     await harness.preparePane(pane, body)
-    captureUserScroll(harness, body, 450)
-    pane.setVisible(false)
-
+    // Opening a transcript clears the saved position by design, so the user scroll has to come
+    // after the re-open. One frame lets the transcript's initial scroll-to-top run; the wheel
+    // then releases suppression so the user's own scroll is what gets saved, while the
+    // remaining render batches stay queued for the restore to wait on.
     pane.sessionCard().props.onClick()
     await flushAsync()
+    harness.frames.flushFrame()
+    body.dispatch('wheel')
+    body.scrollTop = 450
+    harness.frames.flushFrame()
+    body.clearWrites()
+
+    pane.setVisible(false)
     harness.resizeObserverFor(body).trigger()
     anchor.contentTop = 650
     pane.setVisible(true)
     assert.deepEqual(body.writes, [700])
 
-    harness.frames.flushFrame()
-    assert.equal(body.writes.filter(value => value === 700).length, 1)
-    harness.frames.flushFrame()
-    assert.equal(body.writes.filter(value => value === 700).length, 1)
-    harness.frames.flushFrame()
-    assert.equal(body.writes.filter(value => value === 700).length, 1)
-    harness.frames.flushFrame()
-    assert.equal(body.writes.filter(value => value === 700).length, 2)
+    const writesPerFrame = []
+    for (let index = 0; index < 8; index++) {
+      harness.frames.flushFrame()
+      writesPerFrame.push(body.writes.filter(value => value === 700).length)
+    }
+    // Four frames of pending render batches, then the one extra frame, then the settled
+    // re-apply. The leading 1s are the point: the restore must not re-apply while work is
+    // still queued.
+    assert.deepEqual(writesPerFrame, [1, 1, 1, 1, 2, 2, 2, 2])
     harness.frames.flushAll()
   } finally {
     harness.cleanup()
@@ -604,6 +633,72 @@ test('two mounts hide, reveal, and restore their transcript positions independen
 
     assert.equal(bodyA.scrollTop, 1200)
     assert.equal(bodyB.scrollTop, 820)
+  } finally {
+    harness.cleanup()
+  }
+})
+
+test('a programmatic jump to the bottom survives a tab switch', async () => {
+  const middleAnchor = { id: 'message-1', contentTop: 400, height: 200 }
+  const harness = await createHarness()
+  const pane = harness.setupPane('pane-a')
+  const body = createScrollBody({
+    scrollHeight: 1000,
+    clientHeight: 300,
+    anchors: [middleAnchor],
+  })
+  try {
+    await harness.preparePane(pane, body)
+    captureUserScroll(harness, body, 450)
+
+    const jumpPill = pane.jumpPillNode()
+    assert.ok(jumpPill, 'jump-to-bottom control did not render')
+    jumpPill.props.onClick()
+    harness.frames.flushAll()
+    assert.equal(body.scrollTop, 700)
+
+    pane.setVisible(false)
+    body.scrollHeight = 1400
+    pane.setVisible(true)
+    harness.frames.flushAll()
+
+    assert.equal(body.scrollTop, 1100)
+  } finally {
+    harness.cleanup()
+  }
+})
+
+test('restore state does not leak from one transcript to the next', async () => {
+  const sessionA = { ...indexedSession('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'), title: 'Transcript A' }
+  const sessionB = { ...indexedSession('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'), title: 'Transcript B' }
+  const harness = await createHarness({
+    sessions: [sessionA, sessionB],
+    messagesBySession: {
+      [sessionA.id]: [{ ...transcriptMessages(1)[0], content: 'transcript A content' }],
+      [sessionB.id]: [{ ...transcriptMessages(1)[0], content: 'transcript B content' }],
+    },
+  })
+  const pane = harness.setupPane('pane-a')
+  const body = createScrollBody({ scrollHeight: 1000, clientHeight: 300 })
+  try {
+    await harness.preparePane(pane, body)
+    captureUserScroll(harness, body, 700)
+
+    const secondCard = pane.sessionCardFor(sessionB.id)
+    assert.ok(secondCard, 'second session card did not render')
+    secondCard.props.onClick()
+    await flushAsync()
+    assert.ok(flatten(pane.render()).includes('transcript B content'))
+
+    harness.frames.flushFrame()
+    assert.equal(body.scrollTop, 0)
+    body.clearWrites()
+
+    pane.setVisible(false)
+    pane.setVisible(true)
+    harness.frames.flushAll()
+
+    assert.equal(body.scrollTop, 0)
   } finally {
     harness.cleanup()
   }

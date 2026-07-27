@@ -133,3 +133,63 @@ D2-runtime-tail-visibility-watch  @ 5540-5560
 # Fence verdict for T6-T8: IN BOUNDS. 18 hunks, every one inside a declared seam, the
 # per-runtime declaration block, or a scroll-writing path the design names. Nothing landed in
 # the tree, list, picker, search, pins or export code.
+
+# ============================================================================
+# Post-review fix fence -- the four defects the F5 code review found, none of
+# which any test caught. Baseline: 1887e67 (the D2 commit). Line numbers are
+# PRE-EDIT against that tree. Same reading rules and same disclaimer as above.
+# ============================================================================
+
+R1-handoff-outstanding-decl       @ 1420-1421
+R1-initializeAgents-retry         @ 1686-1686
+R1-coordinator-task-counters      @ 1726-1740
+R1-dispose-release                @ 1879-1884
+R2-programmatic-scroll-release    @ 2775-2799
+R2-jump-sites                     @ 3246-3261
+R2-transcript-reset               @ 3299-3323
+
+# Fence verdict: IN BOUNDS. 18 hunks, every one inside a range above. Nothing landed in the
+# index, registry, pins, picker, search, minimap or render internals.
+#
+# What the review found, and what the record should say about it:
+#
+# 1. (HIGH) `handoff.outstanding` was incremented per coordinator task and decremented only
+#    from that task's `finally`. `dispose()` released neither. An operation still pending at a
+#    hot reload -- a confirm dialog torn down mid-await -- therefore left the counter positive
+#    forever, and every future pane waited on `onSettled` that could never fire. That is the
+#    same permanent-dead-pane symptom D1 exists to remove, reintroduced through the mechanism
+#    added to carry state ACROSS a reload. The instance now tracks its own count and releases
+#    it on dispose, marking the handoff dirty because the outcome is unknown.
+#
+# 2. (MEDIUM, but a real D2 miss) Scroll events fired during a programmatic scroll are ignored
+#    on purpose, and the release loop only cleared the flag -- it never captured where the
+#    scroll had landed. So "jump to bottom, switch tab, switch back" restored the PRE-jump
+#    position: the exact defect D2 was opened for, on the path a user is most likely to take.
+#    The first attempt at this fix captured after every programmatic scroll, including the
+#    restore itself, which re-anchored onto whatever element the DOM-order-first heuristic hit
+#    at the restored position -- two existing tests caught that immediately. Capture is now
+#    limited to the jump-class scrolls (minimap tick, jump pill, open-transcript scroll-to-top);
+#    the restore is excluded.
+#
+# 3. (MEDIUM) `stickToBottom` / `scrollAnchorId` survived a transcript change, so a transcript
+#    left at the bottom forced the NEXT transcript to its bottom on the first tab switch.
+#    `resetTranscript` and `openTranscript` now clear the restore state.
+#
+# 4. (MEDIUM, a regression against the pre-refactor code) A failed agent discovery was cached
+#    in `initializationPromise` for the lifetime of `activate()`. Before the per-pane split
+#    every mount re-ran discovery, so closing and reopening the browser retried after the CLI
+#    recovered; afterwards nothing short of an app reload did. Failures are no longer cached.
+#
+# Two findings were recorded and deliberately NOT fixed:
+#   - A reopened pane can still show a session the shared index no longer contains, because
+#     preserve-mode application keeps the current selection by design (so a refresh cannot yank
+#     a transcript away mid-read). The result is a stale detail pane whose actions return a CLI
+#     error, recoverable by selecting anything else. Fixing it needs first-apply-after-restore
+#     validation state; not worth the risk in this commit.
+#   - `pageSize` and the pins `collapsed` flag are per-pane refs writing plugin-global storage
+#     keys, so two panes disagree while mounted and the later one adopts the other's value on
+#     remount. The design's shared/per-pane rules never classified these two.
+#
+# All four fixes carry a regression test, and each was VERIFIED to fail against the pre-fix
+# tree (baseline ui.ts + the new tests, run in a scratch copy): 4/4 failed there with exactly
+# the symptom described above, 4/4 pass here.

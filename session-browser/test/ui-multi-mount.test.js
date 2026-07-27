@@ -246,6 +246,144 @@ function archiveSession(render, title) {
   button.props.onClick({ stopPropagation() {} })
 }
 
+function createInstanceHarness({ failFirstAgents = false } = {}) {
+  const previousDocument = global.document
+  const previousMutationObserver = global.MutationObserver
+  const previousRequestAnimationFrame = global.requestAnimationFrame
+  const previousCancelAnimationFrame = global.cancelAnimationFrame
+  const previousNavigator = Object.getOwnPropertyDescriptor(global, 'navigator')
+  const mounted = []
+  const unmounted = []
+  const panes = []
+  const plugins = []
+  const calls = []
+  const storage = new Map([
+    ['locale', 'en'],
+    ['activeAgent', 'claude-code'],
+  ])
+  let agentCalls = 0
+  let nextArchiveGate = null
+
+  global.document = {
+    documentElement: { lang: 'en-US' },
+    body: { classList: { add() {}, remove() {} } },
+    getElementById() { return null },
+    addEventListener() {},
+    removeEventListener() {},
+  }
+  global.MutationObserver = class { observe() {} disconnect() {} }
+  global.requestAnimationFrame = callback => setTimeout(callback, 0)
+  global.cancelAnimationFrame = handle => clearTimeout(handle)
+  Object.defineProperty(global, 'navigator', {
+    configurable: true,
+    value: { clipboard: { writeText: async () => {} } },
+  })
+
+  const indexed = session('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Reload session')
+  const ctx = {
+    h,
+    ref: value => ({ value }),
+    computed: getter => ({ get value() { return getter() } }),
+    watch() {},
+    onMounted: callback => mounted.push(callback),
+    onUnmounted: callback => unmounted.push(callback),
+    open() {},
+    commands: { register: () => ({ dispose() {} }) },
+    storage: {
+      get: async key => storage.get(key),
+      set: async (key, value) => { storage.set(key, value) },
+    },
+    exec: {
+      run: async args => {
+        calls.push([...args])
+        if (args[0] === 'agents') {
+          agentCalls++
+          if (failFirstAgents && agentCalls === 1) {
+            return {
+              code: 1,
+              stdout: '',
+              stderr: JSON.stringify({ error: 'temporary-agent-failure', message: 'temporary discovery failure' }),
+            }
+          }
+          return {
+            code: 0,
+            stdout: JSON.stringify([{
+              id: 'claude-code',
+              available: true,
+              capabilities,
+              resume: { argv: ['claude', '--resume'] },
+            }]),
+            stderr: '',
+          }
+        }
+        if (args[0] === 'build-index') return { code: 0, stdout: JSON.stringify([indexed]), stderr: '' }
+        if (args[0] === 'list-pins') return { code: 0, stdout: JSON.stringify({ pins: [] }), stderr: '' }
+        if (args[0] === 'archive' && nextArchiveGate) {
+          const gate = nextArchiveGate
+          nextArchiveGate = null
+          return gate.promise
+        }
+        return { code: 0, stdout: JSON.stringify({ outcome: 'success', cacheRefreshed: true }), stderr: '' }
+      },
+    },
+    ui: {
+      notify() {},
+      confirm: async () => true,
+    },
+    terminal: { activePaneId: () => null },
+  }
+
+  function activateInstance() {
+    const plugin = activate(ctx)
+    plugins.push(plugin)
+    return plugin
+  }
+
+  function setupPane(plugin, props) {
+    const mountedIndex = mounted.length
+    const unmountedIndex = unmounted.length
+    const render = plugin.component.setup(props)
+    const mountCallbacks = mounted.slice(mountedIndex)
+    const unmountCallbacks = unmounted.slice(unmountedIndex)
+    let active = false
+    const pane = {
+      render,
+      mount() {
+        if (active) return
+        active = true
+        for (const callback of mountCallbacks) callback()
+      },
+      unmount() {
+        if (!active) return
+        active = false
+        for (const callback of unmountCallbacks) callback()
+      },
+    }
+    panes.push(pane)
+    return pane
+  }
+
+  return {
+    calls,
+    activateInstance,
+    setupPane,
+    holdArchive() {
+      nextArchiveGate = deferred()
+      return nextArchiveGate
+    },
+    cleanup() {
+      for (const pane of panes) pane.unmount()
+      for (const plugin of plugins) plugin.dispose()
+      global.document = previousDocument
+      global.MutationObserver = previousMutationObserver
+      global.requestAnimationFrame = previousRequestAnimationFrame
+      global.cancelAnimationFrame = previousCancelAnimationFrame
+      if (previousNavigator) Object.defineProperty(global, 'navigator', previousNavigator)
+      else delete global.navigator
+    },
+  }
+}
+
 test('two panes keep selection and transcripts independent while sharing initialization', async () => {
   const harness = await mountTwoPanes()
   try {
@@ -344,6 +482,88 @@ test('unmounting one pane leaves the other working and receiving index updates',
     findSessionCard(harness.paneB.render, 'Delta').props.onClick()
     await flush()
     assert.match(textOf(harness.paneB.render()), /transcript-44444444-4444-4444-4444-444444444444/)
+  } finally {
+    harness.cleanup()
+  }
+})
+
+test('hot reload with a pending operation does not wedge the next instance', async () => {
+  const previousWindow = Object.getOwnPropertyDescriptor(global, 'window')
+  global.window = {}
+  const harness = createInstanceHarness()
+  let archiveGate
+  try {
+    const firstPlugin = harness.activateInstance()
+    const firstPane = harness.setupPane(firstPlugin, {
+      paneId: 'reload-pane-a',
+      workspaceId: 'reload-workspace-a',
+      isVisible: true,
+      isFocused: true,
+    })
+    firstPane.mount()
+    await flush()
+
+    archiveGate = harness.holdArchive()
+    archiveSession(firstPane.render, 'Reload session')
+    await flush(2)
+    assert.equal(harness.calls.filter(args => args[0] === 'archive').length, 1)
+
+    firstPlugin.dispose()
+    const buildsBeforeReload = harness.calls.filter(args => args[0] === 'build-index').length
+
+    const secondPlugin = harness.activateInstance()
+    const secondPane = harness.setupPane(secondPlugin, {
+      paneId: 'reload-pane-b',
+      workspaceId: 'reload-workspace-b',
+      isVisible: true,
+      isFocused: true,
+    })
+    secondPane.mount()
+    await flush(12)
+
+    assert.equal(
+      harness.calls.filter(args => args[0] === 'build-index').length,
+      buildsBeforeReload + 1,
+    )
+  } finally {
+    archiveGate?.resolve({
+      code: 0,
+      stdout: JSON.stringify({ outcome: 'success', cacheRefreshed: true }),
+      stderr: '',
+    })
+    await flush()
+    harness.cleanup()
+    if (previousWindow) Object.defineProperty(global, 'window', previousWindow)
+    else delete global.window
+  }
+})
+
+test('a failed agent discovery is retried by the next pane', async () => {
+  const harness = createInstanceHarness({ failFirstAgents: true })
+  try {
+    const plugin = harness.activateInstance()
+    const paneA = harness.setupPane(plugin, {
+      paneId: 'retry-pane-a',
+      workspaceId: 'retry-workspace-a',
+      isVisible: true,
+      isFocused: true,
+    })
+    paneA.mount()
+    await flush()
+
+    assert.equal(harness.calls.filter(args => args[0] === 'agents').length, 1)
+
+    const paneB = harness.setupPane(plugin, {
+      paneId: 'retry-pane-b',
+      workspaceId: 'retry-workspace-b',
+      isVisible: true,
+      isFocused: true,
+    })
+    paneB.mount()
+    await flush(12)
+
+    assert.equal(harness.calls.filter(args => args[0] === 'agents').length, 2)
+    assert.ok(findSessionCard(paneB.render, 'Reload session'))
   } finally {
     harness.cleanup()
   }

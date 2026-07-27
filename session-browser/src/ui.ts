@@ -1418,6 +1418,7 @@ export function activate(ctx: PluginContext): PluginExports {
   let firstIndexFetch = true
   let resolveInitialFetch: (() => void) | null = null
   let installedOnSettled: (() => void) | null = null
+  let localOutstanding = 0
   let initialFetchGate: Promise<void> | null = null
 
   if (handoff.outstanding > 0) {
@@ -1683,7 +1684,22 @@ export function activate(ctx: PluginContext): PluginExports {
 
   function initializeAgents(): Promise<SharedInitializationResult> {
     if (shared.retired) return Promise.resolve({ snapshot: null, error: null })
-    if (!initializationPromise) initializationPromise = discoverAgents()
+    if (!initializationPromise) {
+      // A failed discovery must not be cached for the lifetime of activate(): before the
+      // per-pane split every mount retried it, so a pane reopened after the CLI recovers has
+      // to get a live attempt.
+      const attempt: Promise<SharedInitializationResult> = discoverAgents().then(
+        (result) => {
+          if (result.error && initializationPromise === attempt) initializationPromise = null
+          return result
+        },
+        (caught) => {
+          if (initializationPromise === attempt) initializationPromise = null
+          throw caught
+        },
+      )
+      initializationPromise = attempt
+    }
     return initializationPromise
   }
 
@@ -1724,16 +1740,25 @@ export function activate(ctx: PluginContext): PluginExports {
   const pinMutationQueue: QueuedPinMutation[] = []
 
   function startCoordinatorTask() {
+    localOutstanding++
     handoff.outstanding++
   }
 
-  function settleCoordinatorTask() {
-    handoff.outstanding = Math.max(0, handoff.outstanding - 1)
-    if (shared.retired) handoff.dirty = true
+  function notifyHandoffSettled() {
     if (handoff.outstanding !== 0 || !handoff.onSettled) return
     const onSettled = handoff.onSettled
     handoff.onSettled = null
     onSettled()
+  }
+
+  function settleCoordinatorTask() {
+    // dispose() may already have released this instance's whole count; a late settle must not
+    // decrement a successor's tasks.
+    if (localOutstanding === 0) return
+    localOutstanding--
+    handoff.outstanding = Math.max(0, handoff.outstanding - 1)
+    if (shared.retired) handoff.dirty = true
+    notifyHandoffSettled()
   }
 
   async function drainPinMutationQueue(): Promise<void> {
@@ -1877,10 +1902,20 @@ export function activate(ctx: PluginContext): PluginExports {
     dispose() {
       if (shared.retired) return
       shared.retired = true
+      // Release every task this instance still owns. An operation retired by a hot reload may
+      // never reach its `finally` (a confirm dialog torn down mid-await), and a stuck count
+      // would gate every future pane's first index fetch forever. `dirty` records that the
+      // outcome is unknown, so the successor refreshes.
+      if (localOutstanding > 0) {
+        handoff.dirty = true
+        handoff.outstanding = Math.max(0, handoff.outstanding - localOutstanding)
+        localOutstanding = 0
+      }
       if (handoff.onSettled === installedOnSettled) handoff.onSettled = null
       installedOnSettled = null
       resolveInitialFetch?.()
       resolveInitialFetch = null
+      notifyHandoffSettled()
       coordinator.dispose()
       indexFetches.clear()
       registry.clear()
@@ -2773,12 +2808,26 @@ function createPaneRuntime(ctx: PluginContext, props: any, shared: SharedService
     mount.scrollAnchorOffset = anchor.getBoundingClientRect().top - bodyRect.top
   }
 
+  function resetTranscriptScrollState(mount: MountContext | null) {
+    // Restore metadata belongs to ONE transcript. Carrying it into the next one makes the new
+    // transcript jump to the previous one's saved position on the first tab switch.
+    if (!mount) return
+    mount.stickToBottom = false
+    mount.scrollAnchorId = null
+    mount.scrollAnchorOffset = 0
+    mount.pendingScrollRestore = false
+    mount.programmaticScroll = false
+    mount.restoreGeneration++
+    programmaticScrollSequence++
+  }
+
   function scheduleProgrammaticScrollRelease(
     mount: MountContext,
     body: HTMLElement,
     sequence: number,
     previousPosition: number,
     stableFrames: number,
+    captureOnSettle: boolean,
   ) {
     scheduleMountFrame(mount, () => {
       if (!mount.programmaticScroll || sequence !== programmaticScrollSequence) return
@@ -2786,17 +2835,30 @@ function createPaneRuntime(ctx: PluginContext, props: any, shared: SharedService
       const nextStableFrames = position === previousPosition ? stableFrames + 1 : 0
       if (nextStableFrames >= 2) {
         mount.programmaticScroll = false
+        // A jump moves the transcript to a NEW position the user chose, but every scroll event
+        // it fired was deliberately ignored, so the saved position is still the pre-jump one.
+        // Capture the settled position here, or a jump to the bottom would be undone by the
+        // next tab switch. A restore is excluded: it is already moving to the saved position,
+        // and re-capturing there can re-anchor onto a different element.
+        if (captureOnSettle && isActiveMount(mount) && transcriptScrollRef.value === body) {
+          captureTranscriptScrollPosition(mount, body)
+        }
         return
       }
-      scheduleProgrammaticScrollRelease(mount, body, sequence, position, nextStableFrames)
+      scheduleProgrammaticScrollRelease(mount, body, sequence, position, nextStableFrames, captureOnSettle)
     })
   }
 
-  function performProgrammaticTranscriptScroll(mount: MountContext, body: HTMLElement, write: () => void) {
+  function performProgrammaticTranscriptScroll(
+    mount: MountContext,
+    body: HTMLElement,
+    write: () => void,
+    captureOnSettle = false,
+  ) {
     mount.programmaticScroll = true
     const sequence = ++programmaticScrollSequence
     write()
-    scheduleProgrammaticScrollRelease(mount, body, sequence, body.scrollTop, 0)
+    scheduleProgrammaticScrollRelease(mount, body, sequence, body.scrollTop, 0, captureOnSettle)
   }
 
   function transcriptAnchorSelector(id: string): string {
@@ -3243,7 +3305,7 @@ function createPaneRuntime(ctx: PluginContext, props: any, shared: SharedService
         const maximum = Math.max(0, body.scrollHeight - body.clientHeight)
         body.scrollTop = minimapTurns.length > 1 ? maximum * tick.turnIndex / (minimapTurns.length - 1) : 0
       }
-    })
+    }, true)
   }
 
   function activateJumpPill() {
@@ -3253,12 +3315,13 @@ function createPaneRuntime(ctx: PluginContext, props: any, shared: SharedService
     performProgrammaticTranscriptScroll(mount, body, () => {
       if (jumpPillAtBottom.value) body.scrollTo({ top: 0 })
       else body.scrollTo({ top: Math.max(0, body.scrollHeight - body.clientHeight), behavior: 'smooth' })
-    })
+    }, true)
   }
 
   function resetTranscript() {
     const mount = activeMount
     if (mount) mount.transcriptLoadToken++
+    resetTranscriptScrollState(mount)
     cancelTranscriptFrame()
     if (mount?.copiedTimer) clearTimeout(mount.copiedTimer)
     if (mount) mount.copiedTimer = null
@@ -3297,6 +3360,7 @@ function createPaneRuntime(ctx: PluginContext, props: any, shared: SharedService
     const mount = activeMount
     if (!isActiveMount(mount)) return
     const token = ++mount.transcriptLoadToken
+    resetTranscriptScrollState(mount)
     cancelTranscriptFrame()
     clearMinimapState()
     jumpPillVisible.value = false
@@ -3320,7 +3384,7 @@ function createPaneRuntime(ctx: PluginContext, props: any, shared: SharedService
       scheduleMountFrame(mount, () => {
         const body = transcriptScrollRef.value
         if (token === mount.transcriptLoadToken && body) {
-          performProgrammaticTranscriptScroll(mount, body, () => { body.scrollTop = 0 })
+          performProgrammaticTranscriptScroll(mount, body, () => { body.scrollTop = 0 }, true)
         }
       })
     } catch (caught: any) {
