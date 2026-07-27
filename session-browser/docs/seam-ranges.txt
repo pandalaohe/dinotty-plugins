@@ -1,0 +1,51 @@
+# L3 scope fence -- T1/T1b only (D1 per-pane runtime extraction).
+#
+# What this is:   a bound on WHERE the refactor is allowed to touch src/ui.ts.
+# What it is NOT: a completeness check. A required edit that was never made produces no
+#                 hunk at all, so this fence passes silently on an omission. Completeness
+#                 rests on L1 (`npm run typecheck`, reference class) and L2 (behavioural
+#                 tests + user trial, semantic class). See the design's Coding Framework.
+#
+# Check:
+#   git diff -U0 <baseline-sha> -- src/ui.ts
+# For every hunk header `@@ -old_start[,old_count] +new_start[,new_count] @@`:
+#   - counts are OPTIONAL; a missing count means 1
+#   - old_count == 0 is a pure insertion: it anchors on the line BEFORE the insertion
+#     point and is accepted within +/-1 line of a declared range boundary
+#   - every other changed line must fall inside one range below
+#   - the baseline MUST be an explicit revision; after committing, a bare `git diff` is empty
+#
+# D2 (T6-T8) lands in its own commit with its own fence; its seams (MountContext fields
+# 275-300, renderTranscriptMessage 4808-4833, onTranscriptScroll 2238-2246) are NOT listed here.
+#
+# Line numbers are PRE-EDIT, against src/ui.ts at 5253 lines (verified 2026-07-27).
+# Format: <label> @ <start>-<end>
+
+S14-QueuedPinMutation-interface   @ 218-223
+T1-new-activate-insertion-point   @ 1231-1232
+S1-runtime-declaration-line       @ 1232-1232
+S2-shared-decls-block             @ 1237-1245
+S2-exportDestination              @ 1255-1255
+S2-mutationInFlight               @ 1345-1345
+S2-pin-mutation-lane-decls        @ 1348-1349
+S4-command-registration           @ 1356-1363
+S3-agent-computeds                @ 1365-1368
+S13-pin-mutation-worker           @ 1524-1620
+S12-setFontScale                  @ 1722-1728
+S6-resetForAgentSwitch            @ 1937-1983
+S6-switchAgent                    @ 1985-1997
+S10-initializeAgents              @ 1999-2102
+S7-direct-mutation-sites          @ 2144-2194
+S7-coordinateMutation-definition  @ 2711-2724
+S7-caller-restoreSession          @ 2748-2748
+S7-caller-2752                    @ 2752-2752
+S7-caller-2787                    @ 2787-2787
+S7-caller-2858                    @ 2858-2858
+S7-caller-resumeSession           @ 2886-2886
+S5-loadIndex                      @ 2966-3037
+S11-loadDisplaySettings           @ 3066-3093
+S7-caller-3477                    @ 3477-3477
+S8-search-input-id                @ 4436-4436
+S8-aria-activedescendant          @ 4848-4848
+S8-minimap-tick-id                @ 4859-4859
+S9-component-tail                 @ 5127-5252
