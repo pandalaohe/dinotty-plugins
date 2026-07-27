@@ -96,3 +96,40 @@ S9-component-tail                 @ 5127-5252
 # A3 @ 1343-1343  `let mountGeneration = 0` — hoisted to module scope so mount generations
 #                 cannot collide across runtimes (design §2.1 "Mount identity must be
 #                 globally unique"). Named in T1b's task text but absent from S1-S14.
+
+# ============================================================================
+# D2 fence -- T6/T7/T8 (transcript scroll restore). Separate commit from T1/T1b.
+# Baseline: 18f43f6 (the D1 commit). Line numbers are PRE-EDIT against that tree.
+# Declared before the edit; same reading rules and same disclaimer as above --
+# it bounds the diff, it never shows completeness.
+# ============================================================================
+
+D2-MountContext-interface         @ 275-300
+D2-createMountContext             @ 2266-2298
+D2-updateCompactMode              @ 2414-2427
+D2-observeRootElement             @ 2428-2450
+D2-isTranscriptAtBottom           @ 2731-2733
+D2-updateTranscriptScrollState    @ 2735-2744
+D2-onTranscriptScroll             @ 2746-2754
+D2-setTranscriptScrollElement     @ 3067-3082
+D2-renderNextTranscriptBatch      @ 3120-3140
+D2-renderTranscriptMessage        @ 5318-5345
+D2-runtime-tail-visibility-watch  @ 5540-5560
+
+# --- D2 amendments ----------------------------------------------------------
+# D1 @ 1947, 1997     insertions into the per-runtime declaration block for the new restore
+#                     state -- same under-declaration as A10 above.
+# D2 @ 2470           `observeRootElement`'s element-null branch; the declared range stopped
+#                     at 2450 and the function runs past it.
+# D3 @ 3085-3098      the minimap-jump and jump-pill scroll paths. These write scrollTop with
+#                     `behavior: 'smooth'`, so they are exactly the sites that must now set
+#                     `programmaticScroll`. Named in the design's §2.2 and simply missed when
+#                     this list was written.
+# D4 @ 3163           `renderNextTranscriptBatch`'s tail; declared range stopped at 3140.
+# D5 @ 5638           the runtime tail's `activeMount = mount` region, where the visibility
+#                     watch is installed. The declared 5540-5560 was a guess, not a measurement
+#                     -- the one range on this list that was never verified before use.
+#
+# Fence verdict for T6-T8: IN BOUNDS. 18 hunks, every one inside a declared seam, the
+# per-runtime declaration block, or a scroll-writing path the design names. Nothing landed in
+# the tree, list, picker, search, pins or export code.

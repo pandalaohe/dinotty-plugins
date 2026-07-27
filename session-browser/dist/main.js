@@ -2197,6 +2197,8 @@ function createPaneRuntime(ctx, props, shared) {
   const expandedTools = ctx.ref(/* @__PURE__ */ new Set());
   const copiedSessionId = ctx.ref(false);
   const transcriptScrollRef = ctx.ref(null);
+  let transcriptScrollDisposer = null;
+  let programmaticScrollSequence = 0;
   const detailPaneRef = ctx.ref(null);
   const minimapVisible = ctx.ref(false);
   const minimapTicks = ctx.ref([]);
@@ -2247,6 +2249,7 @@ function createPaneRuntime(ctx, props, shared) {
   let resizeActive = false;
   const COMPACT_BASE_WIDTH = 900;
   let rootWidth = 0;
+  let rootWidthMeasured = false;
   let activeMount = null;
   let hasMounted = Boolean(carriedState);
   let warnedPersistFailure = false;
@@ -2498,6 +2501,12 @@ function createPaneRuntime(ctx, props, shared) {
       transcriptResizeObserver: null,
       transcriptScrollFrame: null,
       minimapRebuildFrame: null,
+      stickToBottom: false,
+      scrollAnchorId: null,
+      scrollAnchorOffset: 0,
+      pendingScrollRestore: false,
+      restoreGeneration: 0,
+      programmaticScroll: false,
       localeObserver: null,
       mobileKbObserverTarget: void 0,
       pinsNoteTimer: null
@@ -2612,6 +2621,7 @@ function createPaneRuntime(ctx, props, shared) {
     scheduleMinimapRebuild();
   }
   function updateCompactMode(width) {
+    if (width === 0 && props.isVisible === false) return;
     rootWidth = width;
     const multiplier = FONT_SCALE_MULTIPLIERS[fontScale.value] || 1;
     const nextCompact = width < COMPACT_BASE_WIDTH * multiplier;
@@ -2626,9 +2636,18 @@ function createPaneRuntime(ctx, props, shared) {
   }
   function observeRootElement(mount2, element) {
     updateCompactMode(element.getBoundingClientRect().width);
+    rootWidthMeasured = true;
     if (typeof ResizeObserver === "undefined") return;
     mount2.rootResizeObserver?.disconnect();
-    mount2.rootResizeObserver = new ResizeObserver(() => updateCompactMode(element.getBoundingClientRect().width));
+    mount2.rootResizeObserver = new ResizeObserver(() => {
+      const previousWidth = rootWidth;
+      const width = element.getBoundingClientRect().width;
+      updateCompactMode(width);
+      if (typeof props.isVisible !== "boolean" && rootWidthMeasured && previousWidth === 0 && width > 0) {
+        triggerTranscriptScrollRestore(mount2);
+      }
+      rootWidthMeasured = true;
+    });
     mount2.rootResizeObserver.observe(element);
     const kbBtn = document.getElementById("kb-toggle-btn");
     if (kbBtn) mount2.rootResizeObserver.observe(kbBtn);
@@ -2665,6 +2684,7 @@ function createPaneRuntime(ctx, props, shared) {
     if (element === rootRef.value) return;
     rootRef.value = element;
     if (!element) {
+      rootWidthMeasured = false;
       activeMount?.rootResizeObserver?.disconnect();
       if (activeMount) activeMount.rootResizeObserver = null;
       return;
@@ -2894,6 +2914,95 @@ function createPaneRuntime(ctx, props, shared) {
   function isTranscriptAtBottom(body) {
     return body.scrollHeight - body.scrollTop - body.clientHeight <= 24;
   }
+  function captureTranscriptScrollPosition(mount2, body) {
+    mount2.stickToBottom = isTranscriptAtBottom(body);
+    if (mount2.stickToBottom) return;
+    const bodyRect = body.getBoundingClientRect();
+    const anchors = Array.from(body.querySelectorAll("[data-transcript-id]"));
+    const anchor = anchors.find((element) => {
+      const rect = element.getBoundingClientRect();
+      return rect.bottom > bodyRect.top && rect.top < bodyRect.bottom;
+    });
+    const anchorId = anchor?.getAttribute("data-transcript-id");
+    if (!anchor || anchorId === null) return;
+    mount2.scrollAnchorId = anchorId;
+    mount2.scrollAnchorOffset = anchor.getBoundingClientRect().top - bodyRect.top;
+  }
+  function scheduleProgrammaticScrollRelease(mount2, body, sequence, previousPosition, stableFrames) {
+    scheduleMountFrame(mount2, () => {
+      if (!mount2.programmaticScroll || sequence !== programmaticScrollSequence) return;
+      const position = body.scrollTop;
+      const nextStableFrames = position === previousPosition ? stableFrames + 1 : 0;
+      if (nextStableFrames >= 2) {
+        mount2.programmaticScroll = false;
+        return;
+      }
+      scheduleProgrammaticScrollRelease(mount2, body, sequence, position, nextStableFrames);
+    });
+  }
+  function performProgrammaticTranscriptScroll(mount2, body, write) {
+    mount2.programmaticScroll = true;
+    const sequence = ++programmaticScrollSequence;
+    write();
+    scheduleProgrammaticScrollRelease(mount2, body, sequence, body.scrollTop, 0);
+  }
+  function transcriptAnchorSelector(id) {
+    const escaped = typeof CSS !== "undefined" && typeof CSS.escape === "function" ? CSS.escape(id) : id.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+    return `[data-transcript-id="${escaped}"]`;
+  }
+  function applySavedTranscriptScrollPosition(mount2) {
+    const body = transcriptScrollRef.value;
+    if (!body) return false;
+    if (mount2.stickToBottom) {
+      performProgrammaticTranscriptScroll(mount2, body, () => {
+        body.scrollTop = Math.max(0, body.scrollHeight - body.clientHeight);
+      });
+      return true;
+    }
+    if (!mount2.scrollAnchorId) return false;
+    const anchor = body.querySelector(transcriptAnchorSelector(mount2.scrollAnchorId));
+    if (!anchor) return false;
+    const bodyTop = body.getBoundingClientRect().top;
+    const anchorOffset = anchor.getBoundingClientRect().top - bodyTop;
+    performProgrammaticTranscriptScroll(mount2, body, () => {
+      body.scrollTop += anchorOffset - mount2.scrollAnchorOffset;
+    });
+    return true;
+  }
+  function scheduleTranscriptScrollRestore(mount2, generation, finalFrame = false) {
+    scheduleMountFrame(mount2, () => {
+      if (generation !== mount2.restoreGeneration || !mount2.pendingScrollRestore) return;
+      if (mount2.transcriptFrame !== null || mount2.minimapRebuildFrame !== null) {
+        scheduleTranscriptScrollRestore(mount2, generation);
+        return;
+      }
+      if (!finalFrame) {
+        scheduleTranscriptScrollRestore(mount2, generation, true);
+        return;
+      }
+      applySavedTranscriptScrollPosition(mount2);
+      mount2.pendingScrollRestore = false;
+    });
+  }
+  function triggerTranscriptScrollRestore(mount2) {
+    if (!isActiveMount(mount2)) return;
+    const generation = ++mount2.restoreGeneration;
+    mount2.pendingScrollRestore = true;
+    applySavedTranscriptScrollPosition(mount2);
+    scheduleTranscriptScrollRestore(mount2, generation);
+  }
+  function cancelTranscriptScrollRestore() {
+    const mount2 = activeMount;
+    if (!isActiveMount(mount2)) return;
+    mount2.pendingScrollRestore = false;
+    mount2.programmaticScroll = false;
+    mount2.restoreGeneration++;
+    programmaticScrollSequence++;
+  }
+  function onTranscriptUserKeydown(event) {
+    if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End", " ", "Spacebar"].includes(event.key)) return;
+    cancelTranscriptScrollRestore();
+  }
   function updateTranscriptScrollState() {
     const body = transcriptScrollRef.value;
     if (!body) return;
@@ -2910,6 +3019,10 @@ function createPaneRuntime(ctx, props, shared) {
     if (!isActiveMount(mount2) || mount2.transcriptScrollFrame !== null) return;
     mount2.transcriptScrollFrame = scheduleMountFrame(mount2, () => {
       mount2.transcriptScrollFrame = null;
+      if (!mount2.programmaticScroll) {
+        const body = transcriptScrollRef.value;
+        if (body) captureTranscriptScrollPosition(mount2, body);
+      }
       updateTranscriptScrollState();
     });
   }
@@ -3205,11 +3318,27 @@ function createPaneRuntime(ctx, props, shared) {
     const mount2 = activeMount;
     const previous = transcriptScrollRef.value;
     if (element === previous) return;
-    if (previous) previous.removeEventListener("scroll", onTranscriptScroll);
+    if (transcriptScrollDisposer) {
+      transcriptScrollDisposer();
+      if (mount2) mount2.disposers.delete(transcriptScrollDisposer);
+      transcriptScrollDisposer = null;
+    }
     mount2?.transcriptResizeObserver?.disconnect();
     transcriptScrollRef.value = element;
     if (!element || !isActiveMount(mount2)) return;
     element.addEventListener("scroll", onTranscriptScroll, { passive: true });
+    element.addEventListener("wheel", cancelTranscriptScrollRestore, { passive: true });
+    element.addEventListener("touchstart", cancelTranscriptScrollRestore, { passive: true });
+    element.addEventListener("keydown", onTranscriptUserKeydown);
+    element.addEventListener("pointerdown", cancelTranscriptScrollRestore, { passive: true });
+    transcriptScrollDisposer = () => {
+      element.removeEventListener("scroll", onTranscriptScroll);
+      element.removeEventListener("wheel", cancelTranscriptScrollRestore);
+      element.removeEventListener("touchstart", cancelTranscriptScrollRestore);
+      element.removeEventListener("keydown", onTranscriptUserKeydown);
+      element.removeEventListener("pointerdown", cancelTranscriptScrollRestore);
+    };
+    addMountDisposer(mount2, transcriptScrollDisposer);
     if (typeof ResizeObserver !== "undefined") {
       mount2.transcriptResizeObserver = new ResizeObserver(() => scheduleMinimapRebuild());
       mount2.transcriptResizeObserver.observe(element);
@@ -3218,19 +3347,25 @@ function createPaneRuntime(ctx, props, shared) {
   }
   function jumpToMinimapTick(tick) {
     const body = transcriptScrollRef.value;
-    if (!body) return;
+    const mount2 = activeMount;
+    if (!body || !isActiveMount(mount2)) return;
     const article = body.querySelector(`[data-transcript-index="${tick.messageIndex}"]`);
-    if (article) article.scrollIntoView({ block: "start", behavior: "smooth" });
-    else {
-      const maximum = Math.max(0, body.scrollHeight - body.clientHeight);
-      body.scrollTop = minimapTurns.length > 1 ? maximum * tick.turnIndex / (minimapTurns.length - 1) : 0;
-    }
+    performProgrammaticTranscriptScroll(mount2, body, () => {
+      if (article) article.scrollIntoView({ block: "start", behavior: "smooth" });
+      else {
+        const maximum = Math.max(0, body.scrollHeight - body.clientHeight);
+        body.scrollTop = minimapTurns.length > 1 ? maximum * tick.turnIndex / (minimapTurns.length - 1) : 0;
+      }
+    });
   }
   function activateJumpPill() {
     const body = transcriptScrollRef.value;
-    if (!body) return;
-    if (jumpPillAtBottom.value) body.scrollTo({ top: 0 });
-    else body.scrollTo({ top: Math.max(0, body.scrollHeight - body.clientHeight), behavior: "smooth" });
+    const mount2 = activeMount;
+    if (!body || !isActiveMount(mount2)) return;
+    performProgrammaticTranscriptScroll(mount2, body, () => {
+      if (jumpPillAtBottom.value) body.scrollTo({ top: 0 });
+      else body.scrollTo({ top: Math.max(0, body.scrollHeight - body.clientHeight), behavior: "smooth" });
+    });
   }
   function resetTranscript() {
     const mount2 = activeMount;
@@ -3291,7 +3426,12 @@ function createPaneRuntime(ctx, props, shared) {
       mount2.allTranscriptMessages = parsed;
       renderNextTranscriptBatch(mount2, token);
       scheduleMountFrame(mount2, () => {
-        if (token === mount2.transcriptLoadToken && transcriptScrollRef.value) transcriptScrollRef.value.scrollTop = 0;
+        const body = transcriptScrollRef.value;
+        if (token === mount2.transcriptLoadToken && body) {
+          performProgrammaticTranscriptScroll(mount2, body, () => {
+            body.scrollTop = 0;
+          });
+        }
       });
     } catch (caught) {
       if (isActiveMount(mount2) && token === mount2.transcriptLoadToken) transcriptError.value = cliError(caught?.message || String(caught));
@@ -5306,7 +5446,8 @@ function createPaneRuntime(ctx, props, shared) {
     return h("article", {
       class: ["ccm-browser-message", isUser ? "ccm-browser-message-user" : "ccm-browser-message-assistant"],
       key: messageKey,
-      "data-transcript-index": String(index)
+      "data-transcript-index": String(index),
+      "data-transcript-id": messageKey
     }, [
       h("div", { class: "ccm-browser-message-gutter" }, [
         h("div", { class: ["ccm-browser-avatar", isUser ? "ccm-browser-avatar-user" : "ccm-browser-avatar-assistant"] }, [
@@ -5624,6 +5765,13 @@ function createPaneRuntime(ctx, props, shared) {
   }
   const mount = createMountContext();
   activeMount = mount;
+  const stopVisibilityWatch = ctx.watch(
+    () => props.isVisible,
+    (visible, previous) => {
+      if (previous === false && visible === true) triggerTranscriptScrollRestore(mount);
+    }
+  );
+  if (typeof stopVisibilityWatch === "function") addMountDisposer(mount, stopVisibilityWatch);
   ctx.onMounted(() => {
     mount.active = true;
     activeMount = mount;
