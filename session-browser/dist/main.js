@@ -1675,6 +1675,7 @@ function activate(ctx) {
   let firstIndexFetch = true;
   let resolveInitialFetch = null;
   let installedOnSettled = null;
+  let localOutstanding = 0;
   let initialFetchGate = null;
   if (handoff.outstanding > 0) {
     initialFetchGate = new Promise((resolve) => {
@@ -1913,7 +1914,19 @@ function activate(ctx) {
   }
   function initializeAgents() {
     if (shared.retired) return Promise.resolve({ snapshot: null, error: null });
-    if (!initializationPromise) initializationPromise = discoverAgents();
+    if (!initializationPromise) {
+      const attempt = discoverAgents().then(
+        (result) => {
+          if (result.error && initializationPromise === attempt) initializationPromise = null;
+          return result;
+        },
+        (caught) => {
+          if (initializationPromise === attempt) initializationPromise = null;
+          throw caught;
+        }
+      );
+      initializationPromise = attempt;
+    }
     return initializationPromise;
   }
   function initializeDisplaySettings() {
@@ -1947,15 +1960,24 @@ function activate(ctx) {
   let sessionMutationInFlight = false;
   const pinMutationQueue = [];
   function startCoordinatorTask() {
+    localOutstanding++;
     handoff.outstanding++;
   }
-  function settleCoordinatorTask() {
-    handoff.outstanding = Math.max(0, handoff.outstanding - 1);
-    if (shared.retired) handoff.dirty = true;
+  function notifyHandoffSettled() {
     if (handoff.outstanding !== 0 || !handoff.onSettled) return;
     const onSettled = handoff.onSettled;
     handoff.onSettled = null;
     onSettled();
+  }
+  function settleCoordinatorTask() {
+    if (localOutstanding === 0) {
+      if (shared.retired) handoff.dirty = true;
+      return;
+    }
+    localOutstanding--;
+    handoff.outstanding = Math.max(0, handoff.outstanding - 1);
+    if (shared.retired) handoff.dirty = true;
+    notifyHandoffSettled();
   }
   async function drainPinMutationQueue() {
     if (laneInFlight || shared.retired) return;
@@ -2116,10 +2138,16 @@ function activate(ctx) {
     dispose() {
       if (shared.retired) return;
       shared.retired = true;
+      if (localOutstanding > 0) {
+        handoff.dirty = true;
+        handoff.outstanding = Math.max(0, handoff.outstanding - localOutstanding);
+        localOutstanding = 0;
+      }
       if (handoff.onSettled === installedOnSettled) handoff.onSettled = null;
       installedOnSettled = null;
       resolveInitialFetch?.();
       resolveInitialFetch = null;
+      notifyHandoffSettled();
       coordinator.dispose();
       indexFetches.clear();
       registry.clear();
@@ -2928,23 +2956,36 @@ function createPaneRuntime(ctx, props, shared) {
     mount2.scrollAnchorId = anchorId;
     mount2.scrollAnchorOffset = anchor.getBoundingClientRect().top - bodyRect.top;
   }
-  function scheduleProgrammaticScrollRelease(mount2, body, sequence, previousPosition, stableFrames) {
+  function resetTranscriptScrollState(mount2) {
+    if (!mount2) return;
+    mount2.stickToBottom = false;
+    mount2.scrollAnchorId = null;
+    mount2.scrollAnchorOffset = 0;
+    mount2.pendingScrollRestore = false;
+    mount2.programmaticScroll = false;
+    mount2.restoreGeneration++;
+    programmaticScrollSequence++;
+  }
+  function scheduleProgrammaticScrollRelease(mount2, body, sequence, previousPosition, stableFrames, captureOnSettle) {
     scheduleMountFrame(mount2, () => {
       if (!mount2.programmaticScroll || sequence !== programmaticScrollSequence) return;
       const position = body.scrollTop;
       const nextStableFrames = position === previousPosition ? stableFrames + 1 : 0;
       if (nextStableFrames >= 2) {
         mount2.programmaticScroll = false;
+        if (captureOnSettle && isActiveMount(mount2) && transcriptScrollRef.value === body) {
+          captureTranscriptScrollPosition(mount2, body);
+        }
         return;
       }
-      scheduleProgrammaticScrollRelease(mount2, body, sequence, position, nextStableFrames);
+      scheduleProgrammaticScrollRelease(mount2, body, sequence, position, nextStableFrames, captureOnSettle);
     });
   }
-  function performProgrammaticTranscriptScroll(mount2, body, write) {
+  function performProgrammaticTranscriptScroll(mount2, body, write, captureOnSettle = false) {
     mount2.programmaticScroll = true;
     const sequence = ++programmaticScrollSequence;
     write();
-    scheduleProgrammaticScrollRelease(mount2, body, sequence, body.scrollTop, 0);
+    scheduleProgrammaticScrollRelease(mount2, body, sequence, body.scrollTop, 0, captureOnSettle);
   }
   function transcriptAnchorSelector(id) {
     const escaped = typeof CSS !== "undefined" && typeof CSS.escape === "function" ? CSS.escape(id) : id.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -3356,20 +3397,24 @@ function createPaneRuntime(ctx, props, shared) {
         const maximum = Math.max(0, body.scrollHeight - body.clientHeight);
         body.scrollTop = minimapTurns.length > 1 ? maximum * tick.turnIndex / (minimapTurns.length - 1) : 0;
       }
-    });
+    }, true);
   }
   function activateJumpPill() {
     const body = transcriptScrollRef.value;
     const mount2 = activeMount;
     if (!body || !isActiveMount(mount2)) return;
+    mount2.stickToBottom = !jumpPillAtBottom.value;
+    mount2.scrollAnchorId = null;
+    mount2.scrollAnchorOffset = 0;
     performProgrammaticTranscriptScroll(mount2, body, () => {
       if (jumpPillAtBottom.value) body.scrollTo({ top: 0 });
       else body.scrollTo({ top: Math.max(0, body.scrollHeight - body.clientHeight), behavior: "smooth" });
-    });
+    }, true);
   }
   function resetTranscript() {
     const mount2 = activeMount;
     if (mount2) mount2.transcriptLoadToken++;
+    resetTranscriptScrollState(mount2);
     cancelTranscriptFrame();
     if (mount2?.copiedTimer) clearTimeout(mount2.copiedTimer);
     if (mount2) mount2.copiedTimer = null;
@@ -3406,6 +3451,7 @@ function createPaneRuntime(ctx, props, shared) {
     const mount2 = activeMount;
     if (!isActiveMount(mount2)) return;
     const token = ++mount2.transcriptLoadToken;
+    resetTranscriptScrollState(mount2);
     cancelTranscriptFrame();
     clearMinimapState();
     jumpPillVisible.value = false;
@@ -3430,7 +3476,7 @@ function createPaneRuntime(ctx, props, shared) {
         if (token === mount2.transcriptLoadToken && body) {
           performProgrammaticTranscriptScroll(mount2, body, () => {
             body.scrollTop = 0;
-          });
+          }, true);
         }
       });
     } catch (caught) {
