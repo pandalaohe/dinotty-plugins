@@ -49,3 +49,50 @@ S8-search-input-id                @ 4436-4436
 S8-aria-activedescendant          @ 4848-4848
 S8-minimap-tick-id                @ 4859-4859
 S9-component-tail                 @ 5127-5252
+
+# --- Amendments -------------------------------------------------------------
+# Ranges the fence FLAGGED during implementation, each inspected and then declared.
+# They are recorded here rather than folded into the list above so the record shows
+# what the fence caught. An excursion is legitimate only with a reason on this list.
+#
+# A1 @ 1233-1234  `const h = ctx.h` / `initIcons(h)` — must move below the `shared`
+#                 destructure, so they cross the S1 declaration line. Required by T1 step 1.
+# A2 @ 1235-1235  insertion anchor for the new module-scope block (SharedServices types,
+#                 mountGeneration counter, createPaneRegistry, the new activate()).
+#                 One line above the +/-1 tolerance around S2's start.
+# Second batch, after the index/mutation/preferences passes. Every one of these traces back
+# to a seam already on the list whose range was drawn around the DEFINITION only, missing the
+# helpers it needs in shared scope and the sites that reference the moved identifier. None
+# landed in minimap, transcript, picker or search internals — which is what the fence is for.
+#
+# A4 @ 1458-1468  pin-path helpers ahead of S13's declared start (S13 was drawn at 1524, the
+#                 pin machinery starts earlier).
+# A5 @ 1879-1936  `parseAgentDescriptors` + `notifyDegradedAgent` — helpers `initializeAgents`
+#                 (S10) needs once it runs in shared scope.
+# A6 @ 1998-1998  blank line between S6-switchAgent (ends 1997) and S10 (starts 1999).
+# A7 @ 2124-2143  `refreshCacheIfNeeded` and its `loadIndex(true, true)` caller — fallout of
+#                 the S5 loadIndex split.
+# A8 @ 2736, 2776, 2875, 3537-3541, 3566-3568   -- WITHDRAWN, and worth keeping on the record.
+#                 These hunks were first read as "call sites of a moved identifier" and waved
+#                 through on that reading. They were not. An intermediate pass had DELETED
+#                 `refreshCacheIfNeeded`, `retagSession` and `removeSession` outright, and these
+#                 were the holes left behind. The fence flagged them correctly; the first
+#                 inspection was too shallow — it read the pre-edit line and not what replaced
+#                 it. The behaviour was restored and these hunks no longer appear in the diff.
+#                 The test suite caught the same loss independently (15 failures).
+# A9 @ 4314-4317  the agent `<select>` render bindings — `mutationInFlight` and `switchAgent`,
+#                 both moved identifiers.
+# A10 @ 1249-1250, 1279, 1346, 1710, 1716, 1839
+#                 more of the same under-declaration: the per-pane ref declarations that share
+#                 the 1237-1349 block, and the shared-preference setters that are siblings of
+#                 `setFontScale` (locale / pageSize / themeFollowHost), each carrying the same
+#                 `activeMount.displayGeneration++` line S12 was declared around.
+#
+# Fence verdict for T1/T1b: IN BOUNDS. 66 hunks, every one inside a declared seam, the
+# 1237-1349 declaration block, or a shared-preference setter. Nothing landed in the minimap,
+# transcript, picker, search or render internals — which is the question this layer answers.
+# It says nothing about whether the edit was COMPLETE; that is L1 and the tests.
+#
+# A3 @ 1343-1343  `let mountGeneration = 0` — hoisted to module scope so mount generations
+#                 cannot collide across runtimes (design §2.1 "Mount identity must be
+#                 globally unique"). Named in T1b's task text but absent from S1-S14.
