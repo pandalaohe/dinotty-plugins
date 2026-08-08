@@ -9,14 +9,14 @@ if not exist "%CLI_SCRIPT%" (
   exit /b 1
 )
 
-rem Prefer node on PATH.
+rem Prefer node on PATH (covers nvm-windows / fnm / volta shims when installed).
 where node >nul 2>nul
-if %errorlevel%==0 (
-  node "%CLI_SCRIPT%" %*
-  exit /b %errorlevel%
-)
+if errorlevel 1 goto find_node
+node "%CLI_SCRIPT%" %*
+exit /b %errorlevel%
 
-rem Fallback to common per-user install locations (nvm-windows / fnm / volta / default).
+:find_node
+rem Fallback: common per-user install locations (nodejs installer, nvm, scoop).
 set "NODE_CAND=%ProgramFiles%\nodejs\node.exe"
 if exist "%NODE_CAND%" goto run
 set "NODE_CAND=%LOCALAPPDATA%\Programs\nodejs\node.exe"
