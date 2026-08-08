@@ -1,4 +1,5 @@
 import * as fs from 'fs'
+import * as os from 'os'
 import * as path from 'path'
 import * as readline from 'readline'
 import * as crypto from 'crypto'
@@ -30,7 +31,7 @@ export function migratePluginSettings(pluginDataBase: string, legacyDirName: str
 }
 
 // --- Paths ---
-const HOME = process.env.HOME || '/root'
+const HOME = process.env.HOME || process.env.USERPROFILE || os.homedir() || '/root'
 const CLAUDE_DIR = path.join(HOME, '.claude')
 const PROJECTS_DIR = process.env.CC_SB_PROJECTS_DIR || path.join(CLAUDE_DIR, 'projects')
 const ARCHIVE_DIR = process.env.CC_SB_ARCHIVE_DIR || path.join(CLAUDE_DIR, 'projects-archive')

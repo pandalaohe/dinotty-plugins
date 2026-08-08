@@ -1,10 +1,11 @@
 import * as fs from 'fs'
+import * as os from 'os'
 import * as path from 'path'
 import * as readline from 'readline'
 import { spawnSync } from 'child_process'
 import { LIVE_WINDOW_MS, type IndexedSession, type Message, type MutationResult, type SessionConnector } from './history-cli'
 
-const HOME = process.env.HOME || '/root'
+const HOME = process.env.HOME || process.env.USERPROFILE || os.homedir() || '/root'
 const LIVE_DB_PATH = path.join(HOME, '.codex', 'state_5.sqlite')
 const LEGACY_DB_PATH = path.join(HOME, '.codex', 'sqlite', 'state_5.sqlite')
 const SESSION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

@@ -24,16 +24,18 @@ var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__ge
 
 // src/history-cli.ts
 var fs2 = __toESM(require("fs"));
+var os2 = __toESM(require("os"));
 var path2 = __toESM(require("path"));
 var readline2 = __toESM(require("readline"));
 var crypto = __toESM(require("crypto"));
 
 // src/codex-connector.ts
 var fs = __toESM(require("fs"));
+var os = __toESM(require("os"));
 var path = __toESM(require("path"));
 var readline = __toESM(require("readline"));
 var import_child_process = require("child_process");
-var HOME = process.env.HOME || "/root";
+var HOME = process.env.HOME || process.env.USERPROFILE || os.homedir() || "/root";
 var LIVE_DB_PATH = path.join(HOME, ".codex", "state_5.sqlite");
 var LEGACY_DB_PATH = path.join(HOME, ".codex", "sqlite", "state_5.sqlite");
 var SESSION_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -611,7 +613,7 @@ function migratePluginSettings(pluginDataBase, legacyDirName, currentDirName) {
   } catch {
   }
 }
-var HOME2 = process.env.HOME || "/root";
+var HOME2 = process.env.HOME || process.env.USERPROFILE || os2.homedir() || "/root";
 var CLAUDE_DIR = path2.join(HOME2, ".claude");
 var PROJECTS_DIR = process.env.CC_SB_PROJECTS_DIR || path2.join(CLAUDE_DIR, "projects");
 var ARCHIVE_DIR = process.env.CC_SB_ARCHIVE_DIR || path2.join(CLAUDE_DIR, "projects-archive");
