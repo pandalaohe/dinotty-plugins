@@ -16,7 +16,7 @@ node "%CLI_SCRIPT%" %*
 exit /b %errorlevel%
 
 :find_node
-rem Fallback: common per-user install locations (nodejs installer, nvm, scoop).
+rem Fallback: common install locations (system nodejs, per-user installer, scoop).
 set "NODE_CAND=%ProgramFiles%\nodejs\node.exe"
 if exist "%NODE_CAND%" goto run
 set "NODE_CAND=%LOCALAPPDATA%\Programs\nodejs\node.exe"
