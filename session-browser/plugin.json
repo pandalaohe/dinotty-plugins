@@ -11,6 +11,7 @@
     "entry": "dist/cli-wrapper",
     "entries": { "windows-x86_64": "dist/cli-wrapper.cmd" }
   },
+  "permissions": ["native.execute"],
   "styles": "./styles.css",
   "commands": [
     { "id": "session-browser.open", "title": "Open Session Browser" },
