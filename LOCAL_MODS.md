@@ -1,3 +1,5 @@
+> FROZEN 2026-09-18 — the ledger moved to the collab root's local_mods/; this file is evidence only.
+
 # Local Modifications Registry
 
 > Fork: pandalaohe/dinotty-plugins (custom branch)
