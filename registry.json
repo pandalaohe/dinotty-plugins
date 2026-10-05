@@ -43,6 +43,20 @@
       "homepage": "https://github.com/xichan96/dinotty-plugins/tree/main/json-formatter"
     },
     {
+      "id": "base64-codec",
+      "name": "Base64 Codec",
+      "description": "Base64 encoding and decoding tool with UTF-8 and URL-safe support",
+      "description_zh": "Base64 编码与解码工具，支持 UTF-8 和 URL-safe 变体",
+      "category": "dev",
+      "version": "1.0.0",
+      "icon": "binary",
+      "repo": "xichan96/dinotty-plugins",
+      "branch": "main",
+      "subdir": "base64-codec",
+      "author": "dinotty",
+      "homepage": "https://github.com/xichan96/dinotty-plugins/tree/main/base64-codec"
+    },
+    {
       "id": "text-diff",
       "name": "Text Diff",
       "description": "Text diff comparison tool with line-by-line highlighting",
