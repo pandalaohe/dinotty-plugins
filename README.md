@@ -10,6 +10,7 @@ Plugin collection for [dinotty](https://github.com/xichan96/dinotty) -- a set of
 | [Command Bookmarks](./command-bookmarks) | 1.0.0 | Bookmark and batch-send commands to multiple terminals | 命令收藏夹，支持批量发送到多个终端 |
 | [Whiteboard](./dinotty-whiteboard) | 1.0.0 | Infinite canvas whiteboard with freehand drawing, shapes, text and images | 无限画布白板工具，支持自由绘图、图形、文本和图片 |
 | [JSON Formatter](./json-formatter) | 1.0.0 | JSON formatting, minifying and validation tool | JSON 格式化、压缩与验证工具 |
+| [Base64 Codec](./base64-codec) | 1.0.0 | Base64 encoding and decoding tool with UTF-8 and URL-safe support | Base64 编码与解码工具，支持 UTF-8 和 URL-safe 变体 |
 | [Skill Manager](./skill-manager) | 1.0.0 | Manage Claude Code Agent Skills (~/.claude/skills/) | 管理 Claude Code Agent Skills (~/.claude/skills/) |
 | [Text Diff](./text-diff) | 1.0.0 | Text diff comparison tool with line-by-line highlighting | 文本差异对比工具，支持逐行对比与高亮显示 |
 | [Claude Code](./claude-code) | 1.0.0 | Visual conversation manager for Claude Code | Claude Code 可视化对话管理 — 浏览历史、新建和恢复会话 |

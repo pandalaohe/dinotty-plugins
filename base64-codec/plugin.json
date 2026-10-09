@@ -1,0 +1,13 @@
+{
+  "id": "base64-codec",
+  "name": "Base64 Codec",
+  "version": "1.0.0",
+  "description": "Base64 编码与解码工具，支持 UTF-8 和 URL-safe 变体",
+  "category": "dev",
+  "icon": "binary",
+  "entry": "./main.js",
+  "styles": "./styles.css",
+  "commands": [
+    { "id": "base64-codec.open", "title": "打开 Base64 编解码工具" }
+  ]
+}

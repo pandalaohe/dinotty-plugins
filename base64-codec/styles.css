@@ -1,0 +1,232 @@
+.b64-root {
+  padding: 16px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  color: var(--text-color, #e0e0e0);
+  box-sizing: border-box;
+  container-type: inline-size;
+}
+
+/* Header */
+.b64-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border, #333);
+}
+.b64-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+.b64-header-opts {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.b64-opt-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted, #aaa);
+  cursor: pointer;
+  user-select: none;
+}
+.b64-checkbox {
+  accent-color: var(--accent, #4d7fff);
+  cursor: pointer;
+}
+
+/* Main layout: two panels with action column in between */
+.b64-layout {
+  flex: 1;
+  display: flex;
+  gap: 10px;
+  min-height: 0;
+}
+
+/* Panel */
+.b64-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.b64-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.b64-panel-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted, #888);
+}
+.b64-stat {
+  font-size: 11px;
+  color: var(--text-muted, #666);
+  flex: 1;
+}
+.b64-panel-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+.b64-textarea {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  resize: none;
+  padding: 10px 12px;
+  background: var(--bg-surface, #1e1e1e);
+  border: 1px solid var(--border, #333);
+  border-radius: 8px;
+  color: var(--text-color, #e0e0e0);
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  outline: none;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+  word-break: break-all;
+  tab-size: 2;
+}
+.b64-textarea:focus {
+  border-color: var(--accent, #4d7fff);
+}
+.b64-textarea::placeholder {
+  color: var(--text-muted, #444);
+}
+.b64-textarea-output {
+  background: var(--bg-main, #121212);
+  cursor: default;
+}
+
+/* Error display */
+.b64-error {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  color: #ef4444;
+  font-size: 13px;
+  line-height: 1.5;
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.b64-error-icon {
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Action column */
+.b64-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding-top: 22px;
+}
+
+/* Buttons */
+.b64-btn {
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.b64-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.b64-btn-primary {
+  background: var(--accent, #4d7fff);
+  color: #fff;
+}
+.b64-btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover, #3a6ae8);
+}
+.b64-btn-ghost {
+  background: transparent;
+  color: var(--text-muted, #aaa);
+}
+.b64-btn-ghost:hover:not(:disabled) {
+  background: var(--bg-hover, #2a2a2a);
+  color: var(--text-color, #e0e0e0);
+}
+.b64-btn-action {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+.b64-btn-copied {
+  color: #34d399 !important;
+}
+
+/* ── Responsive: narrow panel ──────────────────────────────────────────────── */
+@container (max-width: 580px) {
+  .b64-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .b64-header-opts {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  /* Stack panels vertically */
+  .b64-layout {
+    flex-direction: column;
+  }
+  /* Each panel gets a fixed min height instead of flex-stretching */
+  .b64-panel {
+    min-height: 200px;
+    flex: none;
+  }
+  /* Make textareas a fixed height so both fit on screen */
+  .b64-textarea {
+    height: 160px;
+    flex: none;
+  }
+  /* Action buttons go horizontal */
+  .b64-actions {
+    flex-direction: row;
+    justify-content: center;
+    padding-top: 0;
+    flex-wrap: wrap;
+  }
+}
+
+@container (max-width: 400px) {
+  .b64-root {
+    padding: 10px;
+    font-size: 13px;
+  }
+  .b64-title {
+    font-size: 15px;
+  }
+  .b64-panel-actions {
+    flex-wrap: wrap;
+  }
+}
